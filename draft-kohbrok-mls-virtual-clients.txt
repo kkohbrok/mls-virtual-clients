@@ -62,6 +62,7 @@ Table of Contents
      3.5.  Possible message re-ordering
      3.6.  Adding emulator clients
      3.7.  Sending application messages
+       3.7.1.  PPRF-based Challenges
      3.8.  Rotation of authentication key material
    4.  Security considerations
    5.  Privacy considerations
@@ -252,6 +253,54 @@ Table of Contents
       (if the original secret tree is modified), or a safe one that
       defines its own application message (if a new secret tree is
       used))
+
+3.7.1.  PPRF-based Challenges
+
+   Key/nonce pairs used to encrypt application messages are derived
+   using a PPRF.  That is, the Secret Tree in the super group is
+   replaced by a GGM-style PPRF initially keyed by the
+   encryption_secret.  To send an application messaage, the sending
+   emulator client choose a 32 byte challenge and includes it in the
+   authenticated_data field in the PrivateMessage struct.  To derive the
+   nonce and AEAD key for the application message the PPRF is evaluated
+   (and punctured) the PPRF at the challenge.  Due to the entropy in the
+   challenge nonce-reuse guards can be dropped.
+
+   Advantages: - Group Structure Agnostic : The construction is agnostic
+   to all aspects of the group's membership structure.  For example,
+   clients can receive application messages without knowing the sender's
+   leaf index in it's virtual client nor the relative position of the
+   sender's virtual client in the hiearchy of virtual clients making up
+   the super group. - Metadata Hiding: The scheme hides everything about
+   a sender's position in the groups membership heirachy beyond what is
+   revealed by the signature.  For example, application messages are as
+   unlinkabel as permited by their signatures (even for other emulation
+   clients in the same virtual client). - Forward Security Sender
+   Anonymity : Leaking a clients PPRF local state reveals nothing about
+   who sent previously received application messages.  This includes
+   both hiding both the sending emulation clients and even their virtual
+   clients.
+
+   Disadvantages: - Breaks the RFC9420 specification & requires an un-
+   safe extension. - Applications messages have an added 28 byte
+   overhead. - Senders need 28 additional random bytes to send an
+   application message. - A decryption error occurs when receiving an
+   application message with a previously used challenge (in the current
+   epoch).
+
+   There is a trade-off between cost and error probability when choosing
+   b; the bit-length of challenges.  (Above b = 256 which is very
+   conservative.) - Sending two application messages with the same
+   challenge in an epoch immediatly leaks the XOR of the two plaintexts
+   and results in decryption failures for which ever message a client
+   receives second.  The probability a challenge gets re-used when k
+   application messages with b-bit challenges are sent in an epoch
+   (without any coordination) is err = 1-[C(2^b,k)/C(2^b+k-1)].  So
+   larger b reduces the probability of challenge re-use exponentially. -
+   Evaluating the PPRF requires up to b HKDF calls and new 32B values to
+   be stored locally by the client.  Moreover, b-bit challenges impost a
+   8b-4 bytes of overhead in application messages and added random bits
+   when sending.
 
 3.8.  Rotation of authentication key material
 

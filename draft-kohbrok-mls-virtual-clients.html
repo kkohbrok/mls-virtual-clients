@@ -18,7 +18,7 @@ application, virtual clients can help hide metadata and improve performance.
 <meta content="draft-kohbrok-mls-virtual-clients-latest" name="ietf.draft">
 <!-- Generator version information:
   xml2rfc 3.18.2
-    Python 3.11.5
+    Python 3.10.12
     ConfigArgParse 1.7
     google-i18n-address 3.1.0
     intervaltree 3.1.0
@@ -1150,6 +1150,11 @@ application, virtual clients can help hide metadata and improve performance.<a h
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.7">
                 <p id="section-toc.1-1.3.2.7.1"><a href="#section-3.7" class="auto internal xref">3.7</a>.  <a href="#name-sending-application-message" class="internal xref">Sending application messages</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.7.2.1">
+                    <p id="section-toc.1-1.3.2.7.2.1.1"><a href="#section-3.7.1" class="auto internal xref">3.7.1</a>.  <a href="#name-pprf-based-challenges" class="internal xref">PPRF-based Challenges</a></p>
+</li>
+                </ul>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.8">
                 <p id="section-toc.1-1.3.2.8.1"><a href="#section-3.8" class="auto internal xref">3.8</a>.  <a href="#name-rotation-of-authentication-" class="internal xref">Rotation of authentication key material</a></p>
@@ -1390,6 +1395,52 @@ a safe one that defines its own application message (if a new secret tree is
 used))<a href="#section-3.7-2.2.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
+<div id="pprf-based-challenges">
+<section id="section-3.7.1">
+          <h4 id="name-pprf-based-challenges">
+<a href="#section-3.7.1" class="section-number selfRef">3.7.1. </a><a href="#name-pprf-based-challenges" class="section-name selfRef">PPRF-based Challenges</a>
+          </h4>
+<p id="section-3.7.1-1">Key/nonce pairs used to encrypt application messages are derived using a PPRF.
+That is, the Secret Tree in the super group is replaced by a GGM-style PPRF
+initially keyed by the <code>encryption_secret</code>. To send an application messaage,
+the sending emulator client choose a 32 byte challenge and includes it in the
+<code>authenticated_data</code> field in the <code>PrivateMessage</code> struct. To derive the nonce
+and AEAD key for the application message the PPRF is evaluated (and punctured)
+the PPRF at the challenge. Due to the entropy in the challenge nonce-reuse
+guards can be dropped.<a href="#section-3.7.1-1" class="pilcrow">¶</a></p>
+<p id="section-3.7.1-2">Advantages:
+- Group Structure Agnostic : The construction is agnostic to all aspects of the
+group's membership structure. For example, clients can receive application
+messages without knowing the sender's leaf index in it's virtual client nor
+the relative position of the sender's virtual client in the hiearchy of virtual
+clients making up the super group.
+- Metadata Hiding: The scheme hides everything about a sender's position in the
+groups membership heirachy beyond what is revealed by the signature. For
+example, application messages are as unlinkabel as permited by their signatures
+(even for other emulation clients in the same virtual client).
+- Forward Security Sender Anonymity : Leaking a clients PPRF local state reveals
+nothing about who sent previously received application messages. This includes
+both hiding both the sending emulation clients and even their virtual clients.<a href="#section-3.7.1-2" class="pilcrow">¶</a></p>
+<p id="section-3.7.1-3">Disadvantages:
+- Breaks the RFC9420 specification &amp; requires an un-safe extension.
+- Applications messages have an added 28 byte overhead.
+- Senders need 28 additional random bytes to send an application message.
+- A decryption error occurs when receiving an application message with a
+previously used challenge (in the current epoch).<a href="#section-3.7.1-3" class="pilcrow">¶</a></p>
+<p id="section-3.7.1-4">There is a trade-off between cost and error probability when choosing <code>b</code>; the
+bit-length of challenges. (Above <code>b = 256</code> which is very conservative.)
+- Sending two application messages with the same challenge in an epoch
+immediatly leaks the XOR of the two plaintexts and results in decryption
+failures for which ever message a client receives second. The probability a
+challenge gets re-used when <code>k</code> application messages with <code>b</code>-bit challenges
+are sent in an epoch (without any coordination) is
+<code>err = 1-[C(2^b,k)/C(2^b+k-1)]</code>. So larger <code>b</code> reduces the probability of
+challenge re-use exponentially.
+- Evaluating the PPRF requires up to <code>b</code> HKDF calls and new 32B values to be
+stored locally by the client. Moreover, <code>b</code>-bit challenges impost a <code>8b-4</code> bytes
+of overhead in application messages and added random bits when sending.<a href="#section-3.7.1-4" class="pilcrow">¶</a></p>
+</section>
+</div>
 </section>
 </div>
 <div id="rotation-of-authentication-key-material">
