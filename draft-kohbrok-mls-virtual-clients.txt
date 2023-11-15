@@ -5,7 +5,7 @@
 Network Working Group                                         K. Kohbrok
 Internet-Draft                                                 R. Robert
 Intended status: Informational                               Phoenix R&D
-Expires: 16 May 2024                                    13 November 2023
+Expires: 18 May 2024                                    15 November 2023
 
 
                           MLS Virtual Clients
@@ -34,7 +34,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 16 May 2024.
+   This Internet-Draft will expire on 18 May 2024.
 
 Copyright Notice
 
@@ -62,7 +62,7 @@ Table of Contents
      3.5.  Possible message re-ordering
      3.6.  Adding emulator clients
      3.7.  Sending application messages
-       3.7.1.  PPRF-based Challenges
+       3.7.1.  Challenge-based Application Messages
      3.8.  Rotation of authentication key material
    4.  Security considerations
    5.  Privacy considerations
@@ -70,6 +70,7 @@ Table of Contents
      6.1.  Smaller Trees
      6.2.  Fewer blanks
    7.  Emulation costs
+   8.  Normative References
    Authors' Addresses
 
 1.  Introduction
@@ -254,7 +255,241 @@ Table of Contents
       defines its own application message (if a new secret tree is
       used))
 
-3.7.1.  PPRF-based Challenges
+3.7.1.  Challenge-based Application Messages
+
+   The MLS specification defines a method for sending application
+   messages.  To use that method, senders and receivers must know to
+   which ratchet tree leaf the sending client belongs which precludes
+   the possibility of group members sending anonymously to the group; a
+   property that can be desirable for some applications.  The method is
+   designed with receivers in mind that process application messages in
+   roughly the order they were sent.  Consequently, receivers the method
+   imposes significant computational and storage costs for receivers
+   that want skip several application messages to access a more recently
+   sent one directly.  For example, skipping j application messages sent
+   by the same client requires at least j calls to ExpandWithLable and
+   requires storing j secrets for possible later use.
+
+   To better support anonymous sending and random-access processing of
+   application messages, the extension to [RFC9420] described in this
+   section introduces an alternate method for sending application
+   messages called "challenge-based" application messagees.  The method
+   does not require receivers know the senders ratchet tree leaf.  It
+   also allows processing incoming application messages with a cost
+   independent of the order they are received in.  The extension
+   exclusively uses the Safe Extension API of draft-03 of
+   [I-D.draft-ietf-mls-extensions]; i.e. using that draft's terminology
+   it is a "safe extension".
+
+   In comparison MLS's standard applcation messages, challenge-based
+   application messages are KDF.Nh - 4 bytes larger.  Sending and
+   receiving them require (at most) KDF.Nh calls to ExpandWithLabel and
+   storing one secret of size KDF.Nh octets per such call.  This holds
+   for the receiver regardless of how many previouse application
+   messages from the same sender were skipped by the receiver.
+
+   Challenge-based messages can be sent either in one of three modes:
+   random-access, private-anonymous or public-anonymous mode.  Random-
+   access mode application message can be validated and decrypted at a
+   cost independent of how many messages tehe receiver has skipped.  In
+   adition, the two anonymous modes omit any data that could reveal the
+   senders leaf index, authenticating only that the sender is in the
+   group.  In the private-anonymous mode this can only be verified by
+   other group members.  With the public-anonymous mode the group
+   membership of the sender can be verified by external (i.e. non-
+   member) parties such as a server acting as part of the DS.  The
+   anonymous modes come at a price in terms of a slightly weaker flavour
+   of post comporomise message authenticity described in
+   Section 3.7.1.8.  Applications can send each new application message
+   using a different mode which can be chosen when sending.
+
+3.7.1.1.  Challenge Selection
+
+   To send an application message the sender must first sample a
+   challenge.  It is crucial for application message confidentiality
+   that challenges have high entropy and are never used more than once.
+   The following method for sampling challenges ensures this by
+   introducing sufficient entropy and guaranting that two challenges can
+   only ever be the same if they are sampled by the same sender, in the
+   same epoch, for the same message generation using the same entropy.
+
+   For each epoch in which a client wants to send challenge-based
+   application messages it maintains a local uint32 message generation
+   counter for the epoch.  The counter is initilized to 0 and
+   incremented after each challenge is sampled.  If the counter wraps
+   around to 0 then all subsequent attempts by the client to send in the
+   epoch MUST result in a failure.
+
+   uint32 generation;
+
+   To sample a challenge the sender first samples AEAD.Nk uniform random
+   octets called the challenge-seed.  Next the they populate a
+   ChallengeContext including their leaf index, the current generation
+   counter and a hash of the GroupContext.  (A hash is used to avoid
+   having to evaluate the KDF on the, possibly quite large, GroupContext
+   struct each time a new challenge is sampled.)  The application may
+   supply further context in the applicaiton_context field.  Finally,
+   the challenge is derived from the challenge-seed and ChallengeContext
+   using the KDF and tehe generation counter is incremented.
+
+   group_context_hash = Hash(GroupContext)
+
+   struct {
+           opaque group_context_hash;
+           uint32 sender_leaf_index;
+           opaque application_context;
+   } ChallengeContext
+
+   challenge = KDF.Expand(challenge-seed, ChallengeContext, KDF.Nh)
+
+3.7.1.2.  Message Framing
+
+   The following enum and structs define the wire format for challenge-
+   based application messages.
+
+   enum {
+           reserved(0),
+       random-access(1),
+           private-anonymous(2),
+           public-anonymous(3),
+           (256)
+   } CBAMSenderMode
+
+   struct {
+       CBAMSenderMode mode;
+           uint8 challenge[KDF.Nh];
+       select (CBAMSender.mode) {
+           case random-access:
+               uint32 leaf_index;
+           case priavte-anonymous:
+           case public-anonymous:
+               struct{};
+       };
+   } CBAMSender;
+
+   struct {
+       ProtocolVersion version = mls10;
+       WireFormat wire_format;
+       CBAMPrivateMessage private_message;
+   } CBAMMLSMessage;
+
+3.7.1.3.  Message Authentication
+
+   The following structs are used to authenticate data in a challenge-
+   based application message.  When using random-access mode, this is
+   done almost identically to standard application messages.  In public-
+   anonymous mode the signature is producing using the groups signature
+   keys described in Section 3.7.1.7.  The private-anonymous mode omits
+   signatures entirely.
+
+// See the "MLS Wire Formats" IANA registry for values
+uint16 WireFormat;
+
+struct {
+    opaque group_id<V>;
+    uint64 epoch;
+    CBAMSender sender;
+    opaque authenticated_data<V>;
+        opaque application_data<V>;
+} CBAMFramedContent
+
+struct {
+    ProtocolVersion version = mls10;
+    WireFormat wire_format;
+    CBAMFramedContent content;
+        GroupContext context;
+} CBAMFramedContentTBS;
+
+struct {
+        select(FramedContentTBS.content.sender.mode) {
+                case random-access:
+                case public-anonymous:
+                        /* SignWithLabel(., "CBAMFramedContentTBS", CBAMFramedContentTBS) */
+                        opaque signature<V>;
+                case private-anonymous:
+                        struct{};
+        }
+} CBAMFramedContentAuthData;
+
+struct {
+    WireFormat wire_format;
+    CBAMFramedContent content;
+    CBAMFramedContentAuthData auth;
+} CBAMAuthenticatedContent;
+
+   Challenge-based application messages are encoded, authenticated and
+   encrypted much like MLS private messages using the CBAMPrivateMessage
+   struct.
+
+   struct {
+       opaque group_id<V>;
+       uint64 epoch;
+       opaque authenticated_data<V>;
+       opaque encrypted_cbam_sender_data<V>;
+       opaque cbam_encrypted_cbam_private_message_content<V>;
+   } CBAMPrivateMessage;
+
+3.7.1.4.  Content Encryption
+
+   Content to be encrypted is encoded with a CBAMPrivateMessageContent
+   and the Additional Authenticated data is encoded with a
+   CBAMPrivateContentAAD.  The key and nonce used for encryption are
+   derived from the challenge using the FS-KDF described in
+   Section 3.7.1.6.
+
+   struct {
+           opaque application_data<V>;
+       CBAMFramedContentAuthData auth;
+       opaque padding[length_of_padding];
+   } CBAMPrivateMessageContent;
+
+   struct {
+       opaque group_id<V>;
+       uint64 epoch;
+       opaque cbam_authenticated_data<V>;
+   } cbam_PrivateContentAAD;
+
+   aead_key = FS-KDF.Eval(challenge, "key")
+
+   aead_nonce = FS-KDF.Eval(challenge, "nonce")
+
+3.7.1.5.  s Sender Data Encryption
+
+   The encrypted_cbam_sender_data is obtained by encrypting the
+   CBAMSenderData using keys derived from the cbam_sender_data_secret.
+   This secret is exported using the safe API's forward-secure exporter
+   function MLS-FS-Exporter using the label "CBAM Sender Data Secret"
+   and an empty context.  Other than that, the same method is used to
+   encrypt sender data as for standard application messages.
+
+cbam_sender_data_secret = MLS-FS-Export("CBAM Sender Data Secret", "", KDF.Nk)
+
+ciphertext_sample = ciphertext[0..KDF.Nh-1]
+
+sender_data_key = ExpandWithLabel(cbam_sender_data_secret, "key",
+                      ciphertext_sample, AEAD.Nk)
+sender_data_nonce = ExpandWithLabel(cbam_sender_data_secret, "nonce",
+                      ciphertext_sample, AEAD.Nn)
+
+3.7.1.6.  Forward Secure KDF
+
+   Describe how the PPRF based secret tree works for mapping challenges
+   to key/nonce pairs. - derive cbam_encryption_secret using MLS-FS-
+   Exporter. - define key, nonce for a given challenge. - specify
+   deletion schedule.
+
+3.7.1.7.  Group Signature Keys
+
+   *  DeriveSigKeyPair along the lines of DeriveKeyPair in HPKE
+      [RFC9180].
+
+   *  Derive cbam_sender_data_secret.
+
+3.7.1.8.  Security Considerations For Anonymous Modes
+
+   *  Weaker PCS Authenticity.
+
+3.7.1.9.  Legacy Text
 
    Key/nonce pairs used to encrypt application messages are derived
    using a PPRF.  That is, the Secret Tree in the super group is
@@ -372,6 +607,24 @@ Table of Contents
    if the performance benefits from smaller trees and fewer blanks
    outweigh the performance overhead incurred by emulating the virtual
    client in the first place.
+
+8.  Normative References
+
+   [I-D.draft-ietf-mls-extensions]
+              Robert, R., "The Messaging Layer Security (MLS)
+              Extensions", Work in Progress, Internet-Draft, draft-ietf-
+              mls-extensions-03, 23 October 2023,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-mls-
+              extensions-03>.
+
+   [RFC9180]  Barnes, R., Bhargavan, K., Lipp, B., and C. Wood, "Hybrid
+              Public Key Encryption", RFC 9180, DOI 10.17487/RFC9180,
+              February 2022, <https://www.rfc-editor.org/rfc/rfc9180>.
+
+   [RFC9420]  Barnes, R., Beurdouche, B., Robert, R., Millican, J.,
+              Omara, E., and K. Cohn-Gordon, "The Messaging Layer
+              Security (MLS) Protocol", RFC 9420, DOI 10.17487/RFC9420,
+              July 2023, <https://www.rfc-editor.org/rfc/rfc9420>.
 
 Authors' Addresses
 

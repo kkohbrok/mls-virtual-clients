@@ -1033,7 +1033,7 @@ svg :is([fill="white"], [fill^="#fff"]) {
 </tr></thead>
 <tfoot><tr>
 <td class="left">Kohbrok &amp; Robert</td>
-<td class="center">Expires 16 May 2024</td>
+<td class="center">Expires 18 May 2024</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1046,12 +1046,12 @@ svg :is([fill="white"], [fill^="#fff"]) {
 <dd class="internet-draft">draft-kohbrok-mls-virtual-clients-latest</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2023-11-13" class="published">13 November 2023</time>
+<time datetime="2023-11-15" class="published">15 November 2023</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
 <dd class="intended-status">Informational</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2024-05-16">16 May 2024</time></dd>
+<dd class="expires"><time datetime="2024-05-18">18 May 2024</time></dd>
 <dt class="label-authors">Authors:</dt>
 <dd class="authors">
 <div class="author">
@@ -1092,7 +1092,7 @@ application, virtual clients can help hide metadata and improve performance.<a h
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 16 May 2024.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 18 May 2024.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -1152,7 +1152,7 @@ application, virtual clients can help hide metadata and improve performance.<a h
                 <p id="section-toc.1-1.3.2.7.1"><a href="#section-3.7" class="auto internal xref">3.7</a>.  <a href="#name-sending-application-message" class="internal xref">Sending application messages</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.7.2.1">
-                    <p id="section-toc.1-1.3.2.7.2.1.1"><a href="#section-3.7.1" class="auto internal xref">3.7.1</a>.  <a href="#name-pprf-based-challenges" class="internal xref">PPRF-based Challenges</a></p>
+                    <p id="section-toc.1-1.3.2.7.2.1.1"><a href="#section-3.7.1" class="auto internal xref">3.7.1</a>.  <a href="#name-challenge-based-application" class="internal xref">Challenge-based Application Messages</a></p>
 </li>
                 </ul>
 </li>
@@ -1182,7 +1182,10 @@ application, virtual clients can help hide metadata and improve performance.<a h
             <p id="section-toc.1-1.7.1"><a href="#section-7" class="auto internal xref">7</a>.  <a href="#name-emulation-costs" class="internal xref">Emulation costs</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8">
-            <p id="section-toc.1-1.8.1"><a href="#appendix-A" class="auto internal xref"></a><a href="#name-authors-addresses" class="internal xref">Authors' Addresses</a></p>
+            <p id="section-toc.1-1.8.1"><a href="#section-8" class="auto internal xref">8</a>.  <a href="#name-normative-references" class="internal xref">Normative References</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9">
+            <p id="section-toc.1-1.9.1"><a href="#appendix-A" class="auto internal xref"></a><a href="#name-authors-addresses" class="internal xref">Authors' Addresses</a></p>
 </li>
         </ul>
 </nav>
@@ -1395,20 +1398,237 @@ a safe one that defines its own application message (if a new secret tree is
 used))<a href="#section-3.7-2.2.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
-<div id="pprf-based-challenges">
+<div id="challenge-based-application-messages">
 <section id="section-3.7.1">
-          <h4 id="name-pprf-based-challenges">
-<a href="#section-3.7.1" class="section-number selfRef">3.7.1. </a><a href="#name-pprf-based-challenges" class="section-name selfRef">PPRF-based Challenges</a>
+          <h4 id="name-challenge-based-application">
+<a href="#section-3.7.1" class="section-number selfRef">3.7.1. </a><a href="#name-challenge-based-application" class="section-name selfRef">Challenge-based Application Messages</a>
           </h4>
-<p id="section-3.7.1-1">Key/nonce pairs used to encrypt application messages are derived using a PPRF.
+<p id="section-3.7.1-1">The MLS specification defines a method for sending application messages. To use that method, senders and receivers must know to which ratchet tree leaf the sending client belongs which precludes the possibility of group members sending anonymously to the group; a property that can be desirable for some applications. The method is designed with receivers in mind that process application messages in roughly the order they were sent. Consequently, receivers the method imposes significant computational and storage costs for receivers that want skip several application messages to access a more recently sent one directly. For example, skipping <code>j</code> application messages sent by the same client requires at least <code>j</code> calls to <code>ExpandWithLable</code> and requires storing <code>j</code> secrets for possible later use.<a href="#section-3.7.1-1" class="pilcrow">¶</a></p>
+<p id="section-3.7.1-2">To better support anonymous sending and random-access processing of application messages, the extension to <span>[<a href="#RFC9420" class="cite xref">RFC9420</a>]</span> described in this section introduces an alternate method for sending application messages called "challenge-based" application messagees. The method does not require receivers know the senders ratchet tree leaf. It also allows processing incoming application messages with a cost independent of the order they are received in. The extension exclusively uses the Safe Extension API of draft-03 of <span>[<a href="#I-D.draft-ietf-mls-extensions" class="cite xref">I-D.draft-ietf-mls-extensions</a>]</span>; i.e. using that draft's terminology it is a "safe extension".<a href="#section-3.7.1-2" class="pilcrow">¶</a></p>
+<p id="section-3.7.1-3">In comparison MLS's standard applcation messages, challenge-based application messages are KDF.Nh - 4 bytes larger. Sending and receiving them require (at most) KDF.Nh calls to ExpandWithLabel and storing one secret of size KDF.Nh octets per such call. This holds for the receiver regardless of how many previouse application messages from the same sender were skipped by the receiver.<a href="#section-3.7.1-3" class="pilcrow">¶</a></p>
+<p id="section-3.7.1-4">Challenge-based messages can be sent either in one of three modes: random-access, private-anonymous or public-anonymous mode. Random-access mode application message can be validated and decrypted at a cost independent of how many messages tehe receiver has skipped. In adition, the two anonymous modes omit any data that could reveal the senders leaf index, authenticating only that the sender is in the group. In the private-anonymous mode this can only be verified by other group members. With the public-anonymous mode the group membership of the sender can be verified by external (i.e. non-member) parties such as a server acting as part of the DS. The anonymous modes come at a price in terms of a slightly weaker flavour of post comporomise message authenticity described in <a href="#security-considerations-for-anonymous-modes" class="auto internal xref">Section 3.7.1.8</a>. Applications can send each new application message using a different mode which can be chosen when sending.<a href="#section-3.7.1-4" class="pilcrow">¶</a></p>
+<div id="challenge-selection">
+<section id="section-3.7.1.1">
+            <h5 id="name-challenge-selection">
+<a href="#section-3.7.1.1" class="section-number selfRef">3.7.1.1. </a><a href="#name-challenge-selection" class="section-name selfRef">Challenge Selection</a>
+            </h5>
+<p id="section-3.7.1.1-1">To send an application message the sender must first sample a challenge. It is crucial for application message confidentiality that challenges have high entropy and are never used more than once. The following method for sampling challenges ensures this by introducing sufficient entropy and guaranting that two challenges can only ever be the same if they are sampled by the same sender, in the same epoch, for the same message generation using the same entropy.<a href="#section-3.7.1.1-1" class="pilcrow">¶</a></p>
+<p id="section-3.7.1.1-2">For each epoch in which a client wants to send challenge-based application messages it maintains a local uint32 message generation counter for the epoch. The counter is initilized to 0 and incremented after each challenge is sampled. If the counter wraps around to 0 then all subsequent attempts by the client to send in the epoch MUST result in a failure.<a href="#section-3.7.1.1-2" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-3.7.1.1-3">
+<pre>
+uint32 generation;
+</pre><a href="#section-3.7.1.1-3" class="pilcrow">¶</a>
+</div>
+<p id="section-3.7.1.1-4">To sample a challenge the sender first samples AEAD.Nk uniform random octets called the challenge-seed. Next the they populate a ChallengeContext including their leaf index, the current generation counter and a hash of the GroupContext. (A hash is used to avoid having to evaluate the KDF on the, possibly quite large, GroupContext struct each time a new challenge is sampled.) The application may supply further context in the applicaiton_context field. Finally, the challenge is derived from the challenge-seed and ChallengeContext using the KDF and tehe generation counter is incremented.<a href="#section-3.7.1.1-4" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-3.7.1.1-5">
+<pre>
+group_context_hash = Hash(GroupContext)
+
+struct {
+        opaque group_context_hash;
+        uint32 sender_leaf_index;
+        opaque application_context;
+} ChallengeContext
+
+challenge = KDF.Expand(challenge-seed, ChallengeContext, KDF.Nh)
+</pre><a href="#section-3.7.1.1-5" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="message-framing">
+<section id="section-3.7.1.2">
+            <h5 id="name-message-framing">
+<a href="#section-3.7.1.2" class="section-number selfRef">3.7.1.2. </a><a href="#name-message-framing" class="section-name selfRef">Message Framing</a>
+            </h5>
+<p id="section-3.7.1.2-1">The following enum and structs define the wire format for challenge-based application messages.<a href="#section-3.7.1.2-1" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-3.7.1.2-2">
+<pre>
+enum {
+        reserved(0),
+    random-access(1),
+        private-anonymous(2),
+        public-anonymous(3),
+        (256)
+} CBAMSenderMode
+
+struct {
+    CBAMSenderMode mode;
+        uint8 challenge[KDF.Nh];
+    select (CBAMSender.mode) {
+        case random-access:
+            uint32 leaf_index;
+        case priavte-anonymous:
+        case public-anonymous:
+            struct{};
+    };
+} CBAMSender;
+
+struct {
+    ProtocolVersion version = mls10;
+    WireFormat wire_format;
+    CBAMPrivateMessage private_message;
+} CBAMMLSMessage;
+</pre><a href="#section-3.7.1.2-2" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="message-authentication">
+<section id="section-3.7.1.3">
+            <h5 id="name-message-authentication">
+<a href="#section-3.7.1.3" class="section-number selfRef">3.7.1.3. </a><a href="#name-message-authentication" class="section-name selfRef">Message Authentication</a>
+            </h5>
+<p id="section-3.7.1.3-1">The following structs are used to authenticate data in a challenge-based application message. When using random-access mode, this is done almost identically to standard application messages. In public-anonymous mode the signature is producing using the groups signature keys described in <a href="#group-signature-keys" class="auto internal xref">Section 3.7.1.7</a>. The private-anonymous mode omits signatures entirely.<a href="#section-3.7.1.3-1" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-3.7.1.3-2">
+<pre>
+// See the "MLS Wire Formats" IANA registry for values
+uint16 WireFormat;
+
+struct {
+    opaque group_id&lt;V&gt;;
+    uint64 epoch;
+    CBAMSender sender;
+    opaque authenticated_data&lt;V&gt;;
+        opaque application_data&lt;V&gt;;
+} CBAMFramedContent
+
+struct {
+    ProtocolVersion version = mls10;
+    WireFormat wire_format;
+    CBAMFramedContent content;
+        GroupContext context;
+} CBAMFramedContentTBS;
+
+struct {
+        select(FramedContentTBS.content.sender.mode) {
+                case random-access:
+                case public-anonymous:
+                        /* SignWithLabel(., "CBAMFramedContentTBS", CBAMFramedContentTBS) */
+                        opaque signature&lt;V&gt;;
+                case private-anonymous:
+                        struct{};
+        }
+} CBAMFramedContentAuthData;
+
+struct {
+    WireFormat wire_format;
+    CBAMFramedContent content;
+    CBAMFramedContentAuthData auth;
+} CBAMAuthenticatedContent;
+</pre><a href="#section-3.7.1.3-2" class="pilcrow">¶</a>
+</div>
+<p id="section-3.7.1.3-3">Challenge-based application messages are encoded, authenticated and encrypted much like MLS private messages using the CBAMPrivateMessage struct.<a href="#section-3.7.1.3-3" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-3.7.1.3-4">
+<pre>
+struct {
+    opaque group_id&lt;V&gt;;
+    uint64 epoch;
+    opaque authenticated_data&lt;V&gt;;
+    opaque encrypted_cbam_sender_data&lt;V&gt;;
+    opaque cbam_encrypted_cbam_private_message_content&lt;V&gt;;
+} CBAMPrivateMessage;
+</pre><a href="#section-3.7.1.3-4" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="content-encryption">
+<section id="section-3.7.1.4">
+            <h5 id="name-content-encryption">
+<a href="#section-3.7.1.4" class="section-number selfRef">3.7.1.4. </a><a href="#name-content-encryption" class="section-name selfRef">Content Encryption</a>
+            </h5>
+<p id="section-3.7.1.4-1">Content to be encrypted is encoded with a CBAMPrivateMessageContent and the Additional Authenticated data is encoded with a CBAMPrivateContentAAD. The key and nonce used for encryption are derived from the challenge using the FS-KDF described in <a href="#forward-secure-kdf" class="auto internal xref">Section 3.7.1.6</a>.<a href="#section-3.7.1.4-1" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-3.7.1.4-2">
+<pre>
+struct {
+        opaque application_data&lt;V&gt;;
+    CBAMFramedContentAuthData auth;
+    opaque padding[length_of_padding];
+} CBAMPrivateMessageContent;
+
+struct {
+    opaque group_id&lt;V&gt;;
+    uint64 epoch;
+    opaque cbam_authenticated_data&lt;V&gt;;
+} cbam_PrivateContentAAD;
+
+aead_key = FS-KDF.Eval(challenge, "key")
+
+aead_nonce = FS-KDF.Eval(challenge, "nonce")
+</pre><a href="#section-3.7.1.4-2" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="s-sender-data-encryption">
+<section id="section-3.7.1.5">
+            <h5 id="name-s-sender-data-encryption">
+<a href="#section-3.7.1.5" class="section-number selfRef">3.7.1.5. </a><a href="#name-s-sender-data-encryption" class="section-name selfRef">s Sender Data Encryption</a>
+            </h5>
+<p id="section-3.7.1.5-1">The encrypted_cbam_sender_data is obtained by encrypting the CBAMSenderData using keys derived from the cbam_sender_data_secret. This secret is exported using the safe API's forward-secure exporter function MLS-FS-Exporter using the label "CBAM Sender Data Secret" and an empty context. Other than that, the same method is used to encrypt sender data as for standard application messages.<a href="#section-3.7.1.5-1" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-3.7.1.5-2">
+<pre>
+cbam_sender_data_secret = MLS-FS-Export("CBAM Sender Data Secret", "", KDF.Nk)
+
+ciphertext_sample = ciphertext[0..KDF.Nh-1]
+
+sender_data_key = ExpandWithLabel(cbam_sender_data_secret, "key",
+                      ciphertext_sample, AEAD.Nk)
+sender_data_nonce = ExpandWithLabel(cbam_sender_data_secret, "nonce",
+                      ciphertext_sample, AEAD.Nn)
+</pre><a href="#section-3.7.1.5-2" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="forward-secure-kdf">
+<section id="section-3.7.1.6">
+            <h5 id="name-forward-secure-kdf">
+<a href="#section-3.7.1.6" class="section-number selfRef">3.7.1.6. </a><a href="#name-forward-secure-kdf" class="section-name selfRef">Forward Secure KDF</a>
+            </h5>
+<p id="section-3.7.1.6-1">Describe how the PPRF based secret tree works for mapping challenges to key/nonce pairs.
+- derive cbam_encryption_secret using MLS-FS-Exporter.
+- define key, nonce for a given challenge.
+- specify deletion schedule.<a href="#section-3.7.1.6-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="group-signature-keys">
+<section id="section-3.7.1.7">
+            <h5 id="name-group-signature-keys">
+<a href="#section-3.7.1.7" class="section-number selfRef">3.7.1.7. </a><a href="#name-group-signature-keys" class="section-name selfRef">Group Signature Keys</a>
+            </h5>
+<ul class="normal">
+<li class="normal" id="section-3.7.1.7-1.1">
+                <p id="section-3.7.1.7-1.1.1">DeriveSigKeyPair along the lines of DeriveKeyPair in HPKE <span>[<a href="#RFC9180" class="cite xref">RFC9180</a>]</span>.<a href="#section-3.7.1.7-1.1.1" class="pilcrow">¶</a></p>
+</li>
+              <li class="normal" id="section-3.7.1.7-1.2">
+                <p id="section-3.7.1.7-1.2.1">Derive cbam_sender_data_secret.<a href="#section-3.7.1.7-1.2.1" class="pilcrow">¶</a></p>
+</li>
+            </ul>
+</section>
+</div>
+<div id="security-considerations-for-anonymous-modes">
+<section id="section-3.7.1.8">
+            <h5 id="name-security-considerations-for">
+<a href="#section-3.7.1.8" class="section-number selfRef">3.7.1.8. </a><a href="#name-security-considerations-for" class="section-name selfRef">Security Considerations For Anonymous Modes</a>
+            </h5>
+<ul class="normal">
+<li class="normal" id="section-3.7.1.8-1.1">
+                <p id="section-3.7.1.8-1.1.1">Weaker PCS Authenticity.<a href="#section-3.7.1.8-1.1.1" class="pilcrow">¶</a></p>
+</li>
+            </ul>
+</section>
+</div>
+<div id="legacy-text">
+<section id="section-3.7.1.9">
+            <h5 id="name-legacy-text">
+<a href="#section-3.7.1.9" class="section-number selfRef">3.7.1.9. </a><a href="#name-legacy-text" class="section-name selfRef">Legacy Text</a>
+            </h5>
+<p id="section-3.7.1.9-1">Key/nonce pairs used to encrypt application messages are derived using a PPRF.
 That is, the Secret Tree in the super group is replaced by a GGM-style PPRF
 initially keyed by the <code>encryption_secret</code>. To send an application messaage,
 the sending emulator client choose a 32 byte challenge and includes it in the
 <code>authenticated_data</code> field in the <code>PrivateMessage</code> struct. To derive the nonce
 and AEAD key for the application message the PPRF is evaluated (and punctured)
 the PPRF at the challenge. Due to the entropy in the challenge nonce-reuse
-guards can be dropped.<a href="#section-3.7.1-1" class="pilcrow">¶</a></p>
-<p id="section-3.7.1-2">Advantages:
+guards can be dropped.<a href="#section-3.7.1.9-1" class="pilcrow">¶</a></p>
+<p id="section-3.7.1.9-2">Advantages:
 - Group Structure Agnostic : The construction is agnostic to all aspects of the
 group's membership structure. For example, clients can receive application
 messages without knowing the sender's leaf index in it's virtual client nor
@@ -1420,14 +1640,14 @@ example, application messages are as unlinkabel as permited by their signatures
 (even for other emulation clients in the same virtual client).
 - Forward Security Sender Anonymity : Leaking a clients PPRF local state reveals
 nothing about who sent previously received application messages. This includes
-both hiding both the sending emulation clients and even their virtual clients.<a href="#section-3.7.1-2" class="pilcrow">¶</a></p>
-<p id="section-3.7.1-3">Disadvantages:
+both hiding both the sending emulation clients and even their virtual clients.<a href="#section-3.7.1.9-2" class="pilcrow">¶</a></p>
+<p id="section-3.7.1.9-3">Disadvantages:
 - Breaks the RFC9420 specification &amp; requires an un-safe extension.
 - Applications messages have an added 28 byte overhead.
 - Senders need 28 additional random bytes to send an application message.
 - A decryption error occurs when receiving an application message with a
-previously used challenge (in the current epoch).<a href="#section-3.7.1-3" class="pilcrow">¶</a></p>
-<p id="section-3.7.1-4">There is a trade-off between cost and error probability when choosing <code>b</code>; the
+previously used challenge (in the current epoch).<a href="#section-3.7.1.9-3" class="pilcrow">¶</a></p>
+<p id="section-3.7.1.9-4">There is a trade-off between cost and error probability when choosing <code>b</code>; the
 bit-length of challenges. (Above <code>b = 256</code> which is very conservative.)
 - Sending two application messages with the same challenge in an epoch
 immediatly leaks the XOR of the two plaintexts and results in decryption
@@ -1438,7 +1658,9 @@ are sent in an epoch (without any coordination) is
 challenge re-use exponentially.
 - Evaluating the PPRF requires up to <code>b</code> HKDF calls and new 32B values to be
 stored locally by the client. Moreover, <code>b</code>-bit challenges impost a <code>8b-4</code> bytes
-of overhead in application messages and added random bits when sending.<a href="#section-3.7.1-4" class="pilcrow">¶</a></p>
+of overhead in application messages and added random bits when sending.<a href="#section-3.7.1.9-4" class="pilcrow">¶</a></p>
+</section>
+</div>
 </section>
 </div>
 </section>
@@ -1534,6 +1756,27 @@ better performance for all group members.<a href="#section-6.2-1" class="pilcrow
 performance benefits from smaller trees and fewer blanks outweigh the
 performance overhead incurred by emulating the virtual client in the first
 place.<a href="#section-7-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="sec-normative-references">
+<section id="section-8">
+      <h2 id="name-normative-references">
+<a href="#section-8" class="section-number selfRef">8. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
+      </h2>
+<dl class="references">
+<dt id="I-D.draft-ietf-mls-extensions">[I-D.draft-ietf-mls-extensions]</dt>
+      <dd>
+<span class="refAuthor">Robert, R.</span>, <span class="refTitle">"The Messaging Layer Security (MLS) Extensions"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-mls-extensions-03</span>, <time datetime="2023-10-23" class="refDate">23 October 2023</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-mls-extensions-03">https://datatracker.ietf.org/doc/html/draft-ietf-mls-extensions-03</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9180">[RFC9180]</dt>
+      <dd>
+<span class="refAuthor">Barnes, R.</span>, <span class="refAuthor">Bhargavan, K.</span>, <span class="refAuthor">Lipp, B.</span>, and <span class="refAuthor">C. Wood</span>, <span class="refTitle">"Hybrid Public Key Encryption"</span>, <span class="seriesInfo">RFC 9180</span>, <span class="seriesInfo">DOI 10.17487/RFC9180</span>, <time datetime="2022-02" class="refDate">February 2022</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9180">https://www.rfc-editor.org/rfc/rfc9180</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9420">[RFC9420]</dt>
+    <dd>
+<span class="refAuthor">Barnes, R.</span>, <span class="refAuthor">Beurdouche, B.</span>, <span class="refAuthor">Robert, R.</span>, <span class="refAuthor">Millican, J.</span>, <span class="refAuthor">Omara, E.</span>, and <span class="refAuthor">K. Cohn-Gordon</span>, <span class="refTitle">"The Messaging Layer Security (MLS) Protocol"</span>, <span class="seriesInfo">RFC 9420</span>, <span class="seriesInfo">DOI 10.17487/RFC9420</span>, <time datetime="2023-07" class="refDate">July 2023</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9420">https://www.rfc-editor.org/rfc/rfc9420</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+</dl>
 </section>
 </div>
 <div id="authors-addresses">
