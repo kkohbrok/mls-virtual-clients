@@ -5,7 +5,7 @@
 Network Working Group                                         K. Kohbrok
 Internet-Draft                                                 R. Robert
 Intended status: Informational                               Phoenix R&D
-Expires: 18 May 2024                                    15 November 2023
+Expires: 19 May 2024                                    16 November 2023
 
 
                           MLS Virtual Clients
@@ -34,7 +34,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 18 May 2024.
+   This Internet-Draft will expire on 19 May 2024.
 
 Copyright Notice
 
@@ -434,8 +434,8 @@ struct {
    Content to be encrypted is encoded with a CBAMPrivateMessageContent
    and the Additional Authenticated data is encoded with a
    CBAMPrivateContentAAD.  The key and nonce used for encryption are
-   derived from the challenge using the FS-KDF described in
-   Section 3.7.1.6.
+   derived from the encryption_secret and the challenge C using the
+   challenge-based secret tree as described in Section 3.7.1.6.
 
    struct {
            opaque application_data<V>;
@@ -449,11 +449,11 @@ struct {
        opaque cbam_authenticated_data<V>;
    } cbam_PrivateContentAAD;
 
-   aead_key = FS-KDF.Eval(challenge, "key")
+   aead_key = aead_key[C]
 
-   aead_nonce = FS-KDF.Eval(challenge, "nonce")
+   aead_nonce = aead_nonce[C]
 
-3.7.1.5.  s Sender Data Encryption
+3.7.1.5.  Sender Data Encryption
 
    The encrypted_cbam_sender_data is obtained by encrypting the
    CBAMSenderData using keys derived from the cbam_sender_data_secret.
@@ -473,10 +473,48 @@ sender_data_nonce = ExpandWithLabel(cbam_sender_data_secret, "nonce",
 
 3.7.1.6.  Forward Secure KDF
 
-   Describe how the PPRF based secret tree works for mapping challenges
-   to key/nonce pairs. - derive cbam_encryption_secret using MLS-FS-
-   Exporter. - define key, nonce for a given challenge. - specify
-   deletion schedule.
+   A consequence of the secret tree structure in MLS is that deriving
+   the key/nonce for a given application message requires knowing the
+   leaf node of the client.  The symmetric ratchets in MLS require
+   performing as many (KDF and storage) operations as application
+   messages are being skipped.  The challenge-based secret tree (CBST)
+   described in this section avoids these issues.  Like the secret tree
+   in MLS, it consists of a binary tree of secrets.  However, leaves are
+   indexed by challenges instead of leaf nodes which means the tree now
+   has depth KDF.Nh.
+
+   Nodes in the CBST are identified by the string encoding the path from
+   the root to the node.  The root is identified by the empty string "".
+   If a node is identified by string N then its left child is identified
+   the string N||0 and the right child by the string N||1.  Each node is
+   assigned a secret.  The root is assigned the cbam_encryption_secret
+   which is exported from the MLS session using the safe API's FS-Export
+   function.  All other nodes in the CBST are assigned a secrety by
+   applying ExpandWithLabel to its parents secret with appropriate
+   labels.
+
+   cbst_encryption_secret = MLS-FS-Export("CBST", "", KDF.Nh)
+
+   cbst_tree_node_[""]_secret = cbst_encryption_secret
+
+   cbst_tree_node_[N]_secret
+           |
+           |
+           +--> ExpandWithLabel(., "CBST", "left", KDF.Nh)
+           |    = cbst_tree_node_[left(N)]_secret
+           |
+           +--> ExpandWithLabel(., "CBST", "right", KDF.Nh)
+                = cbst_tree_node_[right(N)]_secret
+
+   The key and nonce for a KDF.Nh octet long challenge C are derived
+   from the secret for leaf node identified by C.
+
+aead_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "key", KDF.Nh)
+
+nonce_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "nonce", KDF.Nh)
+
+   The same deletion schedule applies to the CBST (including the
+   cbst_encryption_secret) as for the secret tree in MLS.
 
 3.7.1.7.  Group Signature Keys
 

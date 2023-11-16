@@ -343,9 +343,9 @@ sender_data_nonce = ExpandWithLabel(cbam_sender_data_secret, "nonce",
 ~~~~
 
 #### Forward Secure KDF
-A consequence of the secret tree structure in MLS is that deriving the key/nonce for a given application message requires knowing the leaf node of the client. The symmetric ratchets in MLS require performing as many (KDF and storage) operations as application messages are being skipped. The challenge-based secret tree (CBST) described in this section avoids these issues. Like the secret tree in MLS, it consists of a binary tree of secrets. However, leaves are indexed by challenges instead of leaf nodes which means the tree now has depth KDF.Nh. 
+A consequence of the secret tree structure in MLS is that deriving the key/nonce for a given application message requires knowing the leaf node of the client. The symmetric ratchets in MLS require performing as many (KDF and storage) operations as application messages are being skipped. The challenge-based secret tree (CBST) described in this section avoids these issues. Like the secret tree in MLS, it consists of a binary tree of secrets. However, leaves are indexed by challenges instead of leaf nodes which means the tree now has depth KDF.Nh.
 
-Nodes in the CBST are identified by the string encoding the path from the root to the node. The root is identified by the empty string "". If a node is identified by string N then its left child is identified the string N||0 and the right child by the string N||1. Each node is assigned a secret. The root is assigned the cbam_encryption_secret which is exported from the MLS session using the safe API's FS-Export function. All other nodes in the CBST are assigned a secrety by applying ExpandWithLabel to its parents secret with appropriate labels.
+Nodes in the CBST are identified by the string encoding the path from the root to the node. The root is identified by the empty string "". If a node is identified by string `N` then its left child is identified the string `N||0` and the right child by the string `N||1`. Each node is assigned a secret. The root is assigned the cbam_encryption_secret which is exported from the MLS session using the safe API's FS-Export function. All other nodes in the CBST are assigned a secrety by applying ExpandWithLabel to its parents secret with appropriate labels.
 
 ~~~~
 cbst_encryption_secret = MLS-FS-Export("CBST", "", KDF.Nh)
@@ -362,12 +362,12 @@ cbst_tree_node_[N]_secret
              = cbst_tree_node_[right(N)]_secret
 ~~~~
 
-The key and nonce for a KDF.Nh-bit challenge C are derived from the secret for leaf node identified by C.
+The key and nonce for a KDF.Nh octet long challenge C are derived from the secret for leaf node identified by C.
 
 ~~~~
 aead_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "key", KDF.Nh)
 
-nonce_ke[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "nonce", KDF.Nh)
+nonce_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "nonce", KDF.Nh)
 ~~~~
 
 The same deletion schedule applies to the CBST (including the cbst_encryption_secret) as for the secret tree in MLS.
