@@ -5,7 +5,7 @@
 Network Working Group                                         K. Kohbrok
 Internet-Draft                                                 R. Robert
 Intended status: Informational                               Phoenix R&D
-Expires: 19 May 2024                                    16 November 2023
+Expires: 20 May 2024                                    17 November 2023
 
 
                           MLS Virtual Clients
@@ -34,7 +34,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 19 May 2024.
+   This Internet-Draft will expire on 20 May 2024.
 
 Copyright Notice
 
@@ -447,7 +447,7 @@ struct {
        opaque group_id<V>;
        uint64 epoch;
        opaque cbam_authenticated_data<V>;
-   } cbam_PrivateContentAAD;
+   } CBMAPrivateContentAAD;
 
    aead_key = aead_key[C]
 
@@ -511,23 +511,60 @@ sender_data_nonce = ExpandWithLabel(cbam_sender_data_secret, "nonce",
 
 aead_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "key", KDF.Nh)
 
-nonce_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "nonce", KDF.Nh)
+nonce_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "nonce",
+KDF.Nh)
 
    The same deletion schedule applies to the CBST (including the
    cbst_encryption_secret) as for the secret tree in MLS.
 
 3.7.1.7.  Group Signature Keys
 
-   *  DeriveSigKeyPair along the lines of DeriveKeyPair in HPKE
-      [RFC9180].
+   All clients in an epoch can derive the epoch's group signing key pair
+   using the DeriveSigKeyPair() function associated with the signture
+   scheme of the cipher suite.  It maps input key material octet strings
+   to signature key pairs.  The input key material is obtained using the
+   safe API's forward-secure exporter function.  A signature of a
+   message using the group's signing key represents a publicly
+   verifiable attestation to the message author's group membership while
+   hiding which particular client in the group authored the message.
 
-   *  Derive cbam_sender_data_secret.
+   For ECDSA signature schemes using curves P-256, P-384 and P-512 the
+   DeriveSigKeyPair() algorithm is identical to the DeriveKeyPair()
+   algorithm for those curves in HPKE [RFC9180].  For the Ed25519 and
+   Ed448 signature schemes the DeriveSigKeyPair() is identical to the
+   DeriveKeyPair() algorithm for X25519 and X448 in HPKE [RFC9180]
+   except that the pk(sk) function for deriving Ed25519 and Ed448 public
+   keys from a secret keys given in [RFC8032] are used instead of the
+   functions for X25519 and X448.
+
+   gsig_ikm = MLS-FS-Exporter("Group Signature Keys IKM", "", KDF.Nh)
+
+   (gs-sk, gs-pk) = DeriveSigKeyPair(gsig_ikm)
+
+   As part of a commit, applications MAY want to communicate the new
+   group signing public key to the DS.  For this clients MAY include in
+   an inline safe API extension_proposal proposal in Commit sent as
+   PublicMessage.  For this, clients set the extension_data field of the
+   ExtensionContent to be the new epoch's group public key pg-pk.  Upon
+   receiving a commit with such an extension clients MUST verify that
+   the indicated gs-pk is correct.  If the check fails clients MUST
+   reject commit.
 
 3.7.1.8.  Security Considerations For Anonymous Modes
 
    *  Weaker PCS Authenticity.
 
-3.7.1.9.  Legacy Text
+3.7.1.9.  Thoughts for Safe API
+
+   *  Expose Group Context struct.
+
+   *  Let extensions safely add authenticated_data to MLSMessages.  This
+      lets them communicate data to the DS even though PrivateMessages
+      are being used.  E.g. for commits we might want to let the DS know
+      what the new group signing key is but still use PrivateMessage for
+      a commit to hide everything else.
+
+3.7.1.10.  Legacy Text
 
    Key/nonce pairs used to encrypt application messages are derived
    using a PPRF.  That is, the Secret Tree in the super group is
@@ -654,6 +691,11 @@ nonce_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "nonce", KDF.Nh
               mls-extensions-03, 23 October 2023,
               <https://datatracker.ietf.org/doc/html/draft-ietf-mls-
               extensions-03>.
+
+   [RFC8032]  Josefsson, S. and I. Liusvaara, "Edwards-Curve Digital
+              Signature Algorithm (EdDSA)", RFC 8032,
+              DOI 10.17487/RFC8032, January 2017,
+              <https://www.rfc-editor.org/rfc/rfc8032>.
 
    [RFC9180]  Barnes, R., Bhargavan, K., Lipp, B., and C. Wood, "Hybrid
               Public Key Encryption", RFC 9180, DOI 10.17487/RFC9180,

@@ -138,7 +138,8 @@ group. The emulator client performing the update in the higher level group thus
 has to signal the other emulator clients which emulation group epoch to use to
 export the randomness.
 
-TODO: Find a good way to signal this to the rest of the emulation group. Options:
+TODO: Find a good way to signal this to the rest of the emulation group.
+Options:
 
 - AAD of the higher-level group update (leaks metadata to higher-level groups,
   could collide with application-level use of AAD)
@@ -189,25 +190,75 @@ material. How to avoid this? A few ideas:
   used))
 
 ### Challenge-based Application Messages
-The MLS specification defines a method for sending application messages. To use that method, senders and receivers must know to which ratchet tree leaf the sending client belongs which precludes the possibility of group members sending anonymously to the group; a property that can be desirable for some applications. The method is designed with receivers in mind that process application messages in roughly the order they were sent. Consequently, receivers the method imposes significant computational and storage costs for receivers that want skip several application messages to access a more recently sent one directly. For example, skipping `j` application messages sent by the same client requires at least `j` calls to `ExpandWithLable` and requires storing `j` secrets for possible later use.
+The MLS specification defines a method for sending application messages. To use
+that method, senders and receivers must know to which ratchet tree leaf the
+sending client belongs which precludes the possibility of group members sending
+anonymously to the group; a property that can be desirable for some
+applications. The method is designed with receivers in mind that process
+application messages in roughly the order they were sent. Consequently,
+receivers the method imposes significant computational and storage costs for
+receivers that want skip several application messages to access a more recently
+sent one directly. For example, skipping `j` application messages sent by the
+same client requires at least `j` calls to `ExpandWithLable` and requires
+storing `j` secrets for possible later use.
 
-To better support anonymous sending and random-access processing of application messages, the extension to {{!RFC9420}} described in this section introduces an alternate method for sending application messages called "challenge-based" application messagees. The method does not require receivers know the senders ratchet tree leaf. It also allows processing incoming application messages with a cost independent of the order they are received in. The extension exclusively uses the Safe Extension API of draft-03 of {{!I-D.draft-ietf-mls-extensions}}; i.e. using that draft's terminology it is a "safe extension".
+To better support anonymous sending and random-access processing of application
+messages, the extension to {{!RFC9420}} described in this section introduces an
+alternate method for sending application messages called "challenge-based"
+application messagees. The method does not require receivers know the senders
+ratchet tree leaf. It also allows processing incoming application messages with
+a cost independent of the order they are received in. The extension exclusively
+uses the Safe Extension API of draft-03 of {{!I-D.draft-ietf-mls-extensions}};
+i.e. using that draft's terminology it is a "safe extension".
 
-In comparison MLS's standard applcation messages, challenge-based application messages are KDF.Nh - 4 bytes larger. Sending and receiving them require (at most) KDF.Nh calls to ExpandWithLabel and storing one secret of size KDF.Nh octets per such call. This holds for the receiver regardless of how many previouse application messages from the same sender were skipped by the receiver.
+In comparison MLS's standard applcation messages, challenge-based application
+messages are KDF.Nh - 4 bytes larger. Sending and receiving them require (at
+most) KDF.Nh calls to ExpandWithLabel and storing one secret of size KDF.Nh
+octets per such call. This holds for the receiver regardless of how many
+previouse application messages from the same sender were skipped by the
+receiver.
 
-Challenge-based messages can be sent either in one of three modes: random-access, private-anonymous or public-anonymous mode. Random-access mode application message can be validated and decrypted at a cost independent of how many messages tehe receiver has skipped. In adition, the two anonymous modes omit any data that could reveal the senders leaf index, authenticating only that the sender is in the group. In the private-anonymous mode this can only be verified by other group members. With the public-anonymous mode the group membership of the sender can be verified by external (i.e. non-member) parties such as a server acting as part of the DS. The anonymous modes come at a price in terms of a slightly weaker flavour of post comporomise message authenticity described in {{security-considerations-for-anonymous-modes}}. Applications can send each new application message using a different mode which can be chosen when sending.
+Challenge-based messages can be sent either in one of three modes:
+random-access, private-anonymous or public-anonymous mode. Random-access mode
+application message can be validated and decrypted at a cost independent of how
+many messages tehe receiver has skipped. In adition, the two anonymous modes
+omit any data that could reveal the senders leaf index, authenticating only that
+ the sender is in the group. In the private-anonymous mode this can only be
+verified by other group members. With the public-anonymous mode the group
+membership of the sender can be verified by external (i.e. non-member) parties
+such as a server acting as part of the DS. The anonymous modes come at a price
+in terms of a slightly weaker flavour of post comporomise message authenticity
+described in {{security-considerations-for-anonymous-modes}}. Applications can
+send each new application message using a different mode which can be chosen
+when sending.
 
 #### Challenge Selection
 
-To send an application message the sender must first sample a challenge. It is crucial for application message confidentiality that challenges have high entropy and are never used more than once. The following method for sampling challenges ensures this by introducing sufficient entropy and guaranting that two challenges can only ever be the same if they are sampled by the same sender, in the same epoch, for the same message generation using the same entropy.
+To send an application message the sender must first sample a challenge. It is
+crucial for application message confidentiality that challenges have high
+entropy and are never used more than once. The following method for sampling
+challenges ensures this by introducing sufficient entropy and guaranting that
+two challenges can only ever be the same if they are sampled by the same sender,
+ in the same epoch, for the same message generation using the same entropy.
 
-For each epoch in which a client wants to send challenge-based application messages it maintains a local uint32 message generation counter for the epoch. The counter is initilized to 0 and incremented after each challenge is sampled. If the counter wraps around to 0 then all subsequent attempts by the client to send in the epoch MUST result in a failure.
+For each epoch in which a client wants to send challenge-based application
+messages it maintains a local uint32 message generation counter for the epoch.
+The counter is initilized to 0 and incremented after each challenge is sampled.
+If the counter wraps around to 0 then all subsequent attempts by the client to
+send in the epoch MUST result in a failure.
 
 ~~~~
 uint32 generation;
 ~~~~
 
-To sample a challenge the sender first samples AEAD.Nk uniform random octets called the challenge-seed. Next the they populate a ChallengeContext including their leaf index, the current generation counter and a hash of the GroupContext. (A hash is used to avoid having to evaluate the KDF on the, possibly quite large, GroupContext struct each time a new challenge is sampled.) The application may supply further context in the applicaiton_context field. Finally, the challenge is derived from the challenge-seed and ChallengeContext using the KDF and tehe generation counter is incremented.
+To sample a challenge the sender first samples AEAD.Nk uniform random octets
+called the challenge-seed. Next the they populate a ChallengeContext including
+their leaf index, the current generation counter and a hash of the GroupContext.
+ (A hash is used to avoid having to evaluate the KDF on the, possibly quite
+large, GroupContext struct each time a new challenge is sampled.) The
+application may supply further context in the applicaiton_context field.
+Finally, the challenge is derived from the challenge-seed and ChallengeContext
+using the KDF and tehe generation counter is incremented.
 
 ~~~~
 group_context_hash = Hash(GroupContext)
@@ -222,7 +273,8 @@ challenge = KDF.Expand(challenge-seed, ChallengeContext, KDF.Nh)
 ~~~~
 
 #### Message Framing
-The following enum and structs define the wire format for challenge-based application messages.
+The following enum and structs define the wire format for challenge-based
+application messages.
 
 ~~~~
 enum {
@@ -254,7 +306,11 @@ struct {
 
 
 #### Message Authentication
-The following structs are used to authenticate data in a challenge-based application message. When using random-access mode, this is done almost identically to standard application messages. In public-anonymous mode the signature is producing using the groups signature keys described in {{group-signature-keys}}. The private-anonymous mode omits signatures entirely.
+The following structs are used to authenticate data in a challenge-based
+application message. When using random-access mode, this is done almost
+identically to standard application messages. In public-anonymous mode the
+signature is producing using the groups signature keys described in
+{{group-signature-keys}}. The private-anonymous mode omits signatures entirely.
 
 ~~~~
 
@@ -294,7 +350,8 @@ struct {
 } CBAMAuthenticatedContent;
 ~~~~
 
-Challenge-based application messages are encoded, authenticated and encrypted much like MLS private messages using the CBAMPrivateMessage struct.
+Challenge-based application messages are encoded, authenticated and encrypted
+much like MLS private messages using the CBAMPrivateMessage struct.
 
 ~~~~
 struct {
@@ -308,7 +365,11 @@ struct {
 
 #### Content Encryption
 
-Content to be encrypted is encoded with a CBAMPrivateMessageContent and the Additional Authenticated data is encoded with a CBAMPrivateContentAAD. The key and nonce used for encryption are derived from the encryption_secret and the challenge C using the challenge-based secret tree as described in {{forward-secure-kdf}}.
+Content to be encrypted is encoded with a CBAMPrivateMessageContent and the
+Additional Authenticated data is encoded with a CBAMPrivateContentAAD. The key
+and nonce used for encryption are derived from the encryption_secret and the
+challenge C using the challenge-based secret tree as described in
+{{forward-secure-kdf}}.
 
 ~~~~
 struct {
@@ -321,7 +382,7 @@ struct {
     opaque group_id<V>;
     uint64 epoch;
     opaque cbam_authenticated_data<V>;
-} cbam_PrivateContentAAD;
+} CBMAPrivateContentAAD;
 
 aead_key = aead_key[C]
 
@@ -329,7 +390,11 @@ aead_nonce = aead_nonce[C]
 ~~~~
 
 #### Sender Data Encryption
-The encrypted_cbam_sender_data is obtained by encrypting the CBAMSenderData using keys derived from the cbam_sender_data_secret. This secret is exported using the safe API's forward-secure exporter function MLS-FS-Exporter using the label "CBAM Sender Data Secret" and an empty context. Other than that, the same method is used to encrypt sender data as for standard application messages.
+The encrypted_cbam_sender_data is obtained by encrypting the CBAMSenderData
+using keys derived from the cbam_sender_data_secret. This secret is exported
+using the safe API's forward-secure exporter function MLS-FS-Exporter using the
+label "CBAM Sender Data Secret" and an empty context. Other than that, the same
+method is used to encrypt sender data as for standard application messages.
 
 ~~~~
 cbam_sender_data_secret = MLS-FS-Export("CBAM Sender Data Secret", "", KDF.Nk)
@@ -343,9 +408,22 @@ sender_data_nonce = ExpandWithLabel(cbam_sender_data_secret, "nonce",
 ~~~~
 
 #### Forward Secure KDF
-A consequence of the secret tree structure in MLS is that deriving the key/nonce for a given application message requires knowing the leaf node of the client. The symmetric ratchets in MLS require performing as many (KDF and storage) operations as application messages are being skipped. The challenge-based secret tree (CBST) described in this section avoids these issues. Like the secret tree in MLS, it consists of a binary tree of secrets. However, leaves are indexed by challenges instead of leaf nodes which means the tree now has depth KDF.Nh.
+A consequence of the secret tree structure in MLS is that deriving the key/nonce
+ for a given application message requires knowing the leaf node of the client.
+The symmetric ratchets in MLS require performing as many (KDF and storage)
+operations as application messages are being skipped. The challenge-based secret
+ tree (CBST) described in this section avoids these issues. Like the secret tree
+ in MLS, it consists of a binary tree of secrets. However, leaves are indexed by
+ challenges instead of leaf nodes which means the tree now has depth KDF.Nh.
 
-Nodes in the CBST are identified by the string encoding the path from the root to the node. The root is identified by the empty string "". If a node is identified by string `N` then its left child is identified the string `N||0` and the right child by the string `N||1`. Each node is assigned a secret. The root is assigned the cbam_encryption_secret which is exported from the MLS session using the safe API's FS-Export function. All other nodes in the CBST are assigned a secrety by applying ExpandWithLabel to its parents secret with appropriate labels.
+Nodes in the CBST are identified by the string encoding the path from the root
+to the node. The root is identified by the empty string "". If a node is
+identified by string `N` then its left child is identified the string `N||0` and
+ the right child by the string `N||1`. Each node is assigned a secret. The root
+is assigned the cbam_encryption_secret which is exported from the MLS session
+using the safe API's FS-Export function. All other nodes in the CBST are
+assigned a secrety by applying ExpandWithLabel to its parents secret with
+appropriate labels.
 
 ~~~~
 cbst_encryption_secret = MLS-FS-Export("CBST", "", KDF.Nh)
@@ -362,22 +440,61 @@ cbst_tree_node_[N]_secret
              = cbst_tree_node_[right(N)]_secret
 ~~~~
 
-The key and nonce for a KDF.Nh octet long challenge C are derived from the secret for leaf node identified by C.
+The key and nonce for a KDF.Nh octet long challenge C are derived from the
+secret for leaf node identified by C.
 
 ~~~~
 aead_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "key", KDF.Nh)
 
-nonce_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "nonce", KDF.Nh)
+nonce_key[C] = ExpandWithLabel(cbst_tree_node[C]_secret, "CBST", "nonce",
+KDF.Nh)
 ~~~~
 
-The same deletion schedule applies to the CBST (including the cbst_encryption_secret) as for the secret tree in MLS.
+The same deletion schedule applies to the CBST (including the
+cbst_encryption_secret) as for the secret tree in MLS.
 
 #### Group Signature Keys
-- DeriveSigKeyPair along the lines of DeriveKeyPair in HPKE {{!RFC9180}}.
-- Derive cbam_sender_data_secret.
+All clients in an epoch can derive the epoch's group signing key pair using the
+DeriveSigKeyPair() function associated with the signture scheme of the cipher
+suite. It maps input key material octet strings to signature key pairs. The
+input key material is obtained using the safe API's forward-secure exporter
+function. A signature of a message using  the group's signing key represents a
+publicly verifiable attestation to the message author's group membership while
+hiding which particular client in the group authored the message.
+
+For ECDSA signature schemes using curves P-256, P-384 and P-512 the
+DeriveSigKeyPair() algorithm is identical to the DeriveKeyPair() algorithm for
+those curves in HPKE {{!RFC9180}}. For the Ed25519 and Ed448 signature schemes
+the DeriveSigKeyPair() is identical to the DeriveKeyPair() algorithm for X25519
+and X448 in HPKE {{!RFC9180}} except that the pk(sk) function for deriving
+Ed25519 and Ed448 public keys from a secret keys given in {{!RFC8032}} are used
+instead of the functions for X25519 and X448.
+
+~~~~
+gsig_ikm = MLS-FS-Exporter("Group Signature Keys IKM", "", KDF.Nh)
+
+(gs-sk, gs-pk) = DeriveSigKeyPair(gsig_ikm)
+~~~~
+
+As part of a commit, applications MAY want to communicate the new group signing
+public key to the DS. For this clients MAY include in an inline safe API
+extension_proposal proposal in Commit sent as PublicMessage. For this, clients
+set the extension_data field of the ExtensionContent to be the new epoch's group
+ public key pg-pk. Upon receiving a commit with such an extension clients MUST
+verify that the indicated gs-pk is correct. If the check fails clients MUST
+reject commit.
 
 #### Security Considerations For Anonymous Modes
 - Weaker PCS Authenticity.
+
+#### Thoughts for Safe API
+
+- Expose Group Context struct.
+
+- Let extensions safely add authenticated_data to MLSMessages. This lets them
+communicate data to the DS even though PrivateMessages are being used. E.g. for
+commits we might want to let the DS know what the new group signing key is but
+still use PrivateMessage for a commit to hide everything else.
 
 #### Legacy Text
 
