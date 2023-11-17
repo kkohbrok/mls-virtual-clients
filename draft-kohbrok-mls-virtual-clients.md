@@ -199,7 +199,7 @@ application messages in roughly the order they were sent. Consequently,
 receivers the method imposes significant computational and storage costs for
 receivers that want skip several application messages to access a more recently
 sent one directly. For example, skipping `j` application messages sent by the
-same client requires at least `j` calls to `ExpandWithLable` and requires
+same client requires at least `j` calls to `ExpandWithLabel` and requires
 storing `j` secrets for possible later use.
 
 To better support anonymous sending and random-access processing of application
