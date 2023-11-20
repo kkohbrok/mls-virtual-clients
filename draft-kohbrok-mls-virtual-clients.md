@@ -56,15 +56,15 @@ MLS groups.
   more other clients, each of which can act as the virtual client.
 - Emulator Client: A client that collaborates with other emulator clients in
   emulating a virtual client. Emulator clients can be real or virtual clients.
-- Heirarchical group: A generalization of an MLS group in which members can be 
-either virtual or real clients. Heirarchical group members may also act as 
-emulator clients to collaboratively emulate a virtual client representing the 
-heirarchical group in one or more other heirarchical groups.
-- Group representative: A group representative of (heirarchical group) A in 
-(heirarchical group) B is a virtual client that is member of group B while being
- emulated by the clients in group A. 
-- Subgroup: a heirarchical group with a representative in one or more other 
-groups.
+- Heirarchical group: A generalization of an MLS group in which members can be
+  either virtual or real clients. Heirarchical group members may also act as
+  emulator clients to collaboratively emulate a virtual client representing the
+  heirarchical group in one or more other heirarchical groups.
+- Group representative: A group representative of (heirarchical group) A in
+  (heirarchical group) B is a virtual client that is member of group B while
+  being emulated by the clients in group A.
+- Subgroup: a heirarchical group with a representative in one or more other
+  groups.
 - Supergroup: a heirarchical group with one or more virtual members.
 
 TODO: Terminology is up for debate. We’ve sometimes called this “user trees”,
@@ -73,12 +73,25 @@ now, it’s virtual client emulation.
 
 # Client emulation
 
-To emulate a virtual client, the emulator clients need to agree on the key
-material held by the virtual client and coordinate the actions taken by the
-client in any group of which it is a member. The obvious way for the emulator
-clients to achieve both of these tasks is to create an MLS group which we call
-the emulation group. In contrast, we call any group that the virtual client is a
-member of a higher-level group.
+A set of emulator clients that want to emulate a virtual client R in a group S form their own MLS heirarchical group G (seperate from S). They export secrets from G with which each emulator client can deterministically derive all key material for R's leaf in S. This makes G a subgroup of S and R the representative of G in S. G may have representatives in 0 or more supergroups but can have at most 1 representative in each supergroup. A commit in G creates a new key schedule for G which results in emulator clients deriving new key material for the representatives of G. Therefor, a commit in G SHOULD be accompanied by commits or updates in all supergroups of G transitioning the G's representative in the supergroup to the new leaf key material.
+
+## Path Secrets
+Besides representatives' leaf keys, emulator clients must also synchronize the other secrets held by representatives. For this, a client commit
+
+When emulator clients create commits acting as a representative they derive the path secret
+
+in G need to agree on the key material held by the virtual client R in order to act as R in the supergroup S of which R is a member. For this the emulator clients form
+
+and coordinate the actions taken by the client in any group of which it is a member. The obvious way for the emulator clients to achieve both of these tasks is to create an MLS group which we call the emulation group. In contrast, we call any group that the virtual client is a member of a higher-level group.
+
+OPEN QUESTIONS
+ - A subgroup G may have at most one representative R in supergroups S?
+ - What to say about synchronization between sub/super groups. What must/should/can happen after a commit in sub group? Commit in super group? Is just an update prop OK? What if the prop doesnt get commited for some reason? E.g. no commit is sent in supergroup.
+ - How to derive supergroup key material? (1) Purly off sub-group key schedule? (2) using further entropy sampled at time of commit to supergroup?
+   - Pro: simple. Con: Creates conflict between meta-data hiding vs. PCS. Bad for bandwidth.
+      - PCS vs. metadata: Either commit to all supergroups at same time as each other + subgroup (good for PCS) but bad for meta-data hiding. Or delay (or even drop) supergroup commits which is bad for PCS because leaking emulator clients state today can reveal the entropy for a supergroup commit they do tomorrow. Entropy for supergroup is effectively sampled long before use. Bandwidth: needing to commit in a supergroup ==> new supergroup leaf KEM key ==> need subgroup key commit ==> need commit in all other supergroups.
+   - For (2) e.g. to commit in supergroup, sample fresh commit_seed, send to subgroup (app msg?), derive supergroup keys off subgroup key schedule + commit_seed.
+
 
 ## Example protocol flow
 

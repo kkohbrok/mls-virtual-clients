@@ -5,7 +5,7 @@
 Network Working Group                                         K. Kohbrok
 Internet-Draft                                                 R. Robert
 Intended status: Informational                               Phoenix R&D
-Expires: 16 May 2024                                    13 November 2023
+Expires: 23 May 2024                                    20 November 2023
 
 
                           MLS Virtual Clients
@@ -34,7 +34,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 16 May 2024.
+   This Internet-Draft will expire on 23 May 2024.
 
 Copyright Notice
 
@@ -55,15 +55,16 @@ Table of Contents
    1.  Introduction
    2.  Terminology
    3.  Client emulation
-     3.1.  Example protocol flow
-     3.2.  DS/AS Details
-     3.3.  Agreement on/generation of key material
-     3.4.  Coordinating virtual client operations
-     3.5.  Possible message re-ordering
-     3.6.  Adding emulator clients
-     3.7.  Sending application messages
-       3.7.1.  PPRF-based Challenges
-     3.8.  Rotation of authentication key material
+     3.1.  Path Secrets
+     3.2.  Example protocol flow
+     3.3.  DS/AS Details
+     3.4.  Agreement on/generation of key material
+     3.5.  Coordinating virtual client operations
+     3.6.  Possible message re-ordering
+     3.7.  Adding emulator clients
+     3.8.  Sending application messages
+       3.8.1.  PPRF-based Challenges
+     3.9.  Rotation of authentication key material
    4.  Security considerations
    5.  Privacy considerations
    6.  Performance considerations
@@ -92,14 +93,34 @@ Table of Contents
 
 2.  Terminology
 
-   *  Client: An MLS client
+   *  Client: Any MLS client including emulator clients, virtual clients
+      and real clients.
 
-   *  Virtual Client: A client the key material of which is held by one
-      or more (other) clients.
+   *  Real Client: An MLS client whose secret key material is help by a
+      single agent.
+
+   *  Virtual Client: A client for which the secret key material is held
+      by one or more other clients, each of which can act as the virtual
+      client.
 
    *  Emulator Client: A client that collaborates with other emulator
-      clients in emulating a virtual client.  Emulator clients can
-      themselves be virtual clients.
+      clients in emulating a virtual client.  Emulator clients can be
+      real or virtual clients.
+
+   *  Heirarchical group: A generalization of an MLS group in which
+      members can be either virtual or real clients.  Heirarchical group
+      members may also act as emulator clients to collaboratively
+      emulate a virtual client representing the heirarchical group in
+      one or more other heirarchical groups.
+
+   *  Group representative: A group representative of (heirarchical
+      group) A in (heirarchical group) B is a virtual client that is
+      member of group B while being emulated by the clients in group A.
+
+   *  Subgroup: a heirarchical group with a representative in one or
+      more other groups.
+
+   *  Supergroup: a heirarchical group with one or more virtual members.
 
    TODO: Terminology is up for debate.  We’ve sometimes called this
    “user trees”, but since there are other use cases, we should choose a
@@ -107,21 +128,66 @@ Table of Contents
 
 3.  Client emulation
 
-   To emulate a virtual client, the emulator clients need to agree on
-   the key material held by the virtual client and coordinate the
-   actions taken by the client in any group of which it is a member.
-   The obvious way for the emulator clients to achieve both of these
-   tasks is to create an MLS group which we call the emulation group.
-   In contrast, we call any group that the virtual client is a member of
-   a higher-level group.
+   A set of emulator clients that want to emulate a virtual client R in
+   a group S form their own MLS heirarchical group G (seperate from S).
+   They export secrets from G with which each emulator client can
+   deterministically derive all key material for R's leaf in S.  This
+   makes G a subgroup of S and R the representative of G in S.  G may
+   have representatives in 0 or more supergroups but can have at most 1
+   representative in each supergroup.  A commit in G creates a new key
+   schedule for G which results in emulator clients deriving new key
+   material for the representatives of G.  Therefor, a commit in G
+   SHOULD be accompanied by commits or updates in all supergroups of G
+   transitioning the G's representative in the supergroup to the new
+   leaf key material.
 
-3.1.  Example protocol flow
+3.1.  Path Secrets
+
+   Besides representatives' leaf keys, emulator clients must also
+   synchronize the other secrets held by representatives.  For this, a
+   client commit
+
+   When emulator clients create commits acting as a representative they
+   derive the path secret
+
+   in G need to agree on the key material held by the virtual client R
+   in order to act as R in the supergroup S of which R is a member.  For
+   this the emulator clients form
+
+   and coordinate the actions taken by the client in any group of which
+   it is a member.  The obvious way for the emulator clients to achieve
+   both of these tasks is to create an MLS group which we call the
+   emulation group.  In contrast, we call any group that the virtual
+   client is a member of a higher-level group.
+
+   OPEN QUESTIONS - A subgroup G may have at most one representative R
+   in supergroups S?  - What to say about synchronization between sub/
+   super groups.  What must/should/can happen after a commit in sub
+   group?  Commit in super group?  Is just an update prop OK?  What if
+   the prop doesnt get commited for some reason?  E.g. no commit is sent
+   in supergroup.  - How to derive supergroup key material? (1) Purly
+   off sub-group key schedule? (2) using further entropy sampled at time
+   of commit to supergroup?  - Pro: simple.  Con: Creates conflict
+   between meta-data hiding vs. PCS.  Bad for bandwidth.  - PCS vs.
+   metadata: Either commit to all supergroups at same time as each other
+   + subgroup (good for PCS) but bad for meta-data hiding.  Or delay (or
+   even drop) supergroup commits which is bad for PCS because leaking
+   emulator clients state today can reveal the entropy for a supergroup
+   commit they do tomorrow.  Entropy for supergroup is effectively
+   sampled long before use.  Bandwidth: needing to commit in a
+   supergroup ==> new supergroup leaf KEM key ==> need subgroup key
+   commit ==> need commit in all other supergroups.  - For (2) e.g. to
+   commit in supergroup, sample fresh commit_seed, send to subgroup (app
+   msg?), derive supergroup keys off subgroup key schedule +
+   commit_seed.
+
+3.2.  Example protocol flow
 
    TODO: Go through a full flow, where both sender and receiver are
    virtual clients.  Include both communication in the higher-level
    group and in the emulation group.
 
-3.2.  DS/AS Details
+3.3.  DS/AS Details
 
    Virtual client emulation should be largely agnostic to specific
    details of the AS and DS of the application.  However, a few
@@ -136,7 +202,7 @@ Table of Contents
       workarounds like one emulator client retrieving messages and then
       sending them to the emulation group are possible.)
 
-3.3.  Agreement on/generation of key material
+3.4.  Agreement on/generation of key material
 
    Agreement on key material is one of the primary features of MLS and
    the emulator clients can simply export secrets from the emulation
@@ -153,7 +219,7 @@ Table of Contents
 
    TODO: Be more explicit on how the randomness is exported.
 
-3.4.  Coordinating virtual client operations
+3.5.  Coordinating virtual client operations
 
    Generally, emulator clients should coordinate the actions taken by
    the virtual client.  This is, for example, to prevent multiple
@@ -168,7 +234,7 @@ Table of Contents
    that affect more than one higher-level group (such as credential
    updates, depending on the AS).
 
-3.5.  Possible message re-ordering
+3.6.  Possible message re-ordering
 
    One difficulty in coordinating the use of randomness exported from
    the emulation group is that we cannot assume that messages arrive in
@@ -205,7 +271,7 @@ Table of Contents
 
    *  LeafNode extension (leaks metadata to higher-level groups)
 
-3.6.  Adding emulator clients
+3.7.  Adding emulator clients
 
    If a client is added to the emulation group, it has to be provisioned
    with the private key material and the group states of all higher-
@@ -227,7 +293,7 @@ Table of Contents
    via external commit, except if said secrets are provided
    asynchronously.
 
-3.7.  Sending application messages
+3.8.  Sending application messages
 
    Open Question: Key material for encryption/decryption of application
    messages is used only once.  Since there is no ordering of
@@ -254,7 +320,7 @@ Table of Contents
       defines its own application message (if a new secret tree is
       used))
 
-3.7.1.  PPRF-based Challenges
+3.8.1.  PPRF-based Challenges
 
    Key/nonce pairs used to encrypt application messages are derived
    using a PPRF.  That is, the Secret Tree in the super group is
@@ -302,7 +368,7 @@ Table of Contents
    8b-4 bytes of overhead in application messages and added random bits
    when sending.
 
-3.8.  Rotation of authentication key material
+3.9.  Rotation of authentication key material
 
    If the design of the AS specifies the use of cross-group
    authentication key material, emulator clients must coordinate the
