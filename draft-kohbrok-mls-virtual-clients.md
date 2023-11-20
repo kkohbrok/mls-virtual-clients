@@ -541,6 +541,9 @@ challenge re-use exponentially.
 stored locally by the client. Moreover, `b`-bit challenges impost a `8b-4` bytes
 of overhead in application messages and added random bits when sending.
 
+TODO:
+ - If at most 2^k application messages may be sent (cumulatively across all clients) and the goal is s bits of security (e.g. s=128) how do we set challenge length b? E.g. b=k+s? or b=k+2s?
+
 ## Rotation of authentication key material
 
 If the design of the AS specifies the use of cross-group authentication key
