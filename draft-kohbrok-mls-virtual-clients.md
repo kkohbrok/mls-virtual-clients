@@ -49,8 +49,8 @@ MLS groups.
 # Terminology
 
 - Client: An MLS client
-- Virtual Client: A client the key material of which is held by one or more
-  (other) clients.
+- Virtual Client: A client for which the key material of which is held by one or
+  more (other) clients.
 - Emulator Client: A client that collaborates with other emulator clients in
   emulating a virtual client. Emulator clients can themselves be virtual
   clients.
