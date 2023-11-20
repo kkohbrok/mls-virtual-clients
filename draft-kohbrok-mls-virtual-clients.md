@@ -48,7 +48,9 @@ MLS groups.
 
 # Terminology
 
-- Client: An MLS client
+- Client: An MLS client including virtual, real and emulator clients.
+- Real Client: An MLS client for which the key material is help to a single
+  physical device.
 - Virtual Client: A client for which the key material of which is held by one or
   more (other) clients.
 - Emulator Client: A client that collaborates with other emulator clients in
