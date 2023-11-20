@@ -60,9 +60,9 @@ MLS groups.
   either virtual or real clients. Heirarchical group members may also act as
   emulator clients to collaboratively emulate a virtual client representing the
   heirarchical group in one or more other heirarchical groups.
-- Group representative: A group representative of (heirarchical group) A in
-  (heirarchical group) B is a virtual client that is member of group B while
-  being emulated by the clients in group A.
+- Group representative: A group representative of (heirarchical group) G is a
+  virtual client emulated by the clients in G. The group representative of group
+  G in another group S is the representative of G that is a member S.
 - Subgroup: a heirarchical group with a representative in one or more other
   groups.
 - Supergroup: a heirarchical group with one or more virtual members.
@@ -73,25 +73,45 @@ now, it’s virtual client emulation.
 
 # Client emulation
 
-A set of emulator clients that want to emulate a virtual client R in a group S form their own MLS heirarchical group G (seperate from S). They export secrets from G with which each emulator client can deterministically derive all key material for R's leaf in S. This makes G a subgroup of S and R the representative of G in S. G may have representatives in 0 or more supergroups but can have at most 1 representative in each supergroup. A commit in G creates a new key schedule for G which results in emulator clients deriving new key material for the representatives of G. Therefor, a commit in G SHOULD be accompanied by commits or updates in all supergroups of G transitioning the G's representative in the supergroup to the new leaf key material.
+A set of emulator clients that want to emulate one or more virtual clients form an MLS heirarchical group G. To act as a virtual client R representing G the emulating clients in G must each learn all secret held by R. This includes secrets associated with R's key packages and leaf nodes in groups R is a member of. This is done by deriving any such secrets deterministically using seeds exported from G's key schedule. To help coordinate this, the emulator client that first creates a representative R of group G assigns R a virtual client ID unique among all representatives of G. Similarly, as part of their creation, each key package of R is assigned an ID unique among all key packages generated for R using the same epoch's key schedule.
 
-## Path Secrets
-Besides representatives' leaf keys, emulator clients must also synchronize the other secrets held by representatives. For this, a client commit
+Virtual clients R can join or create any group S just like real clients. When this ocures, G becomes a subgroup of supergroup S and R is G's representative in S. G may have 0 or more representatives which can each be a member of 0 or more supergroups. However, G can have at most 1 representative in a supergroup S.
 
-When emulator clients create commits acting as a representative they derive the path secret
+## Generating Virtual Client Secrets
+For each epoch in G members use the Safe API's FS-Export method to obtain the virtual_client_seed for the epoch.
 
-in G need to agree on the key material held by the virtual client R in order to act as R in the supergroup S of which R is a member. For this the emulator clients form
+~~~~
+virtual_client_seed = MLS-Export("Virtual Client Seed", "", HKDF.Nh)
+~~~~
 
-and coordinate the actions taken by the client in any group of which it is a member. The obvious way for the emulator clients to achieve both of these tasks is to create an MLS group which we call the emulation group. In contrast, we call any group that the virtual client is a member of a higher-level group.
+Later, they derive further seeds from virtual using the following context struct.
 
-OPEN QUESTIONS
- - A subgroup G may have at most one representative R in supergroups S?
- - What to say about synchronization between sub/super groups. What must/should/can happen after a commit in sub group? Commit in super group? Is just an update prop OK? What if the prop doesnt get commited for some reason? E.g. no commit is sent in supergroup.
- - How to derive supergroup key material? (1) Purly off sub-group key schedule? (2) using further entropy sampled at time of commit to supergroup?
-   - Pro: simple. Con: Creates conflict between meta-data hiding vs. PCS. Bad for bandwidth.
-      - PCS vs. metadata: Either commit to all supergroups at same time as each other + subgroup (good for PCS) but bad for meta-data hiding. Or delay (or even drop) supergroup commits which is bad for PCS because leaking emulator clients state today can reveal the entropy for a supergroup commit they do tomorrow. Entropy for supergroup is effectively sampled long before use. Bandwidth: needing to commit in a supergroup ==> new supergroup leaf KEM key ==> need subgroup key commit ==> need commit in all other supergroups.
-   - For (2) e.g. to commit in supergroup, sample fresh commit_seed, send to subgroup (app msg?), derive supergroup keys off subgroup key schedule + commit_seed.
+~~~~
+struct {
+  uint16 virtual_client_ID;
+  opaque context
+} VClientSeedContext
 
+seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSeedContext)
+~~~~
+
+OPEN QUESTION
+- Is there any point to useing Safe API's FS-Exporter here? Maybe for the flow: Gen KP. KP used for Welcome msg. Process Welcome to join supergroup S. Delete init_key sk. Now we want FS for init_key to kick in immediatly (i.e. without having to first move G to a new epoch to clear out its exporter_secret.) ATM I'm not sure how to do this with out a PPRF... The hard part is giving emulator clients the ability to generate future KP secrets while also makeing sure that we get FS for those secrets when they are deleted again all within the same epoch of G. FS-Exporter + PPRF solves this but thats probably a bit heavy, at least if we want to avoid collisions when different emulator clients concurrently generate KPs.
+- How to coordinate KeyPackage IDs? We could use an extension in the KP to signal its KPID to other emulator clients. But if we avoid that, then a virtual clients KP could look identical to that of a real client which would be cool. Maybe signal KPIDs for upcoming KP's in a commit to G? Seems robust (guarantees coordination and avoids collisions on KPIDs) but also a bit limiting. If decide I want to generate a new KP for a representative I now first have to commit in G but not for security, just to tell people the new KPID. But application msgs aren't even guaranteed to arrive so is that ok? Also should we use explicite KPIDs? or is it ok to use the init_key in the KP as the KPID?
+
+## Key Package
+If this is a new representative then first choose VCID. Choose fresh KPID(s). Commit in G anouncing (VCID and) KPIDs privatly to the group. Generate KPs from new epochs key schedule using VCID and KPID in the context.
+
+## Commits and Proposals in Supergroups.
+To commit as a representative in supergroup S, first commit in subgroup G. Next use new epoch's key schedule to derive new leaf node and path secret for representative's commit in S. In VClientSeedContext include S's GroupContext to avoid collisions between supergroups.
+
+- Do we care if two emulator clients produce similar commits concurrently? I dont think its a security issue, just a bit messy. Could reveal that a client is virtual not real though?
+
+## Challenge-Based Application Messages.
+Needed so that emulator dont collide on key/nonce pairs when concurrently sending in a supergroup. See random-access mode in git branch app-msgs for details.
+
+## Adding and Removing Emulator Clients
+Send them the local states of all representativs of G encrypted in their welcome message. No action needs to be taken in any super group.
 
 ## Example protocol flow
 
