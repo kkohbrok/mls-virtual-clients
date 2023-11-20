@@ -48,14 +48,24 @@ MLS groups.
 
 # Terminology
 
-- Client: An MLS client including virtual, real and emulator clients.
-- Real Client: An MLS client for which the key material is help to a single
-  physical device.
-- Virtual Client: A client for which the key material of which is held by one or
-  more (other) clients.
-- Emulator Client: A client that collaborates with other emulator clients in
-  emulating a virtual client. Emulator clients can themselves be virtual
+- Client: Any MLS client including emulator clients, virtual clients and real
   clients.
+- Real Client: An MLS client whose secret key material is help by a single
+  agent.
+- Virtual Client: A client for which the secret key material is held by one or
+  more other clients, each of which can act as the virtual client.
+- Emulator Client: A client that collaborates with other emulator clients in
+  emulating a virtual client. Emulator clients can be real or virtual clients.
+- Heirarchical group: A generalization of an MLS group in which members can be 
+either virtual or real clients. Heirarchical group members may also act as 
+emulator clients to collaboratively emulate a virtual client representing the 
+heirarchical group in one or more other heirarchical groups.
+- Group representative: A group representative of (heirarchical group) A in 
+(heirarchical group) B is a virtual client that is member of group B while being
+ emulated by the clients in group A. 
+- Subgroup: a heirarchical group with a representative in one or more other 
+groups.
+- Supergroup: a heirarchical group with one or more virtual members.
 
 TODO: Terminology is up for debate. We’ve sometimes called this “user trees”,
 but since there are other use cases, we should choose a more neutral name. For
