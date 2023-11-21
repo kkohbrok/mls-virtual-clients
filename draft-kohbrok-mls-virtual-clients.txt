@@ -243,45 +243,22 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
 
    OPEN QUESTIONS
 
-   Not sure how to provide immediate FS for consumed virtual client key
-   packages.  Some strawmen designs I can think of right now are:
+   The following issue arrises for commits, proposals key packages of
+   virtual clients.  There's a trade-off between ensuring tight PCS vs.
+   minimizing number of (subgroup) commits.  Here are 2 strawmen designs
+   for managing virtual client key packages showing the trade-off:
 
-   1.  use FS-Exporter to get kp_tree_secret.  Initilize a PPRF = MLS
-       Secret Tree with root kp_tree_secret.  Use
-       PPRF(emulator_client_leaf, KP_generation) to get an FS key k.
-       Set kp_seed := HKDF(k, pre-seed, VClientSeedContext) with fresh
-       random pre-seed to get PCS for kp_seed.  Generate KP secrets
-       using kp_seed. delete k and kp_seed.  At any time, delete KP
-       secrets get immediate FS for the KP.
+   1.  Sample fresh kp_seed.  Generate KP secrets with kp_seed.  Send
+       (KP, kp_seed) to subgroup in application message.  Pro: no
+       subgroup commit needed to generate KP.  Con: PCS window for KP
+       starts at begining of subgroup epoch instead of when KP was
+       actually generated.
 
-   2.  use MLS-Exporter with fresh random pre-seed as label to get
-       kp_seed with PCS.  Force subgroup commit when a KP consumed to
-       ensure exporter_secret deleted for FS.
-
-   3.  use FS-Export to get kp_seed + generating a KP requires first
-       anouncing to subgroup in a subgroup commit.  PCS from subgroup
-       commit PCS.  FS because FS-Exporter.
-
-   The hard part is minimizing the need for (subgroup) commits while
-   ensuring immediate FS for consumed KPs. (1)-(3) solve this with
-   different trade-offs:
-
-   1.  imposes largest local state and compute cost but also requires no
-       commits and has optimal PCFS for KPs.  Requires subgroup App Msgs
-       (or somethign similar) to coordinate when KPs generated.
-
-   2.  simpler than 1. but imposes commit dependency between super/sub
-       groups.  Probably makes FS for supergroup welcome msgs more
-       complicated to ensure.  What if subgroup commit fails for some
-       reason?  Which emulator client should issue subgroup commit to
-       avoid "stampeding herd"? requires subgroup App Msg to coordinate
-       secrets when KP created.
-
-   3.  simpler than 1. & avoids stampeding herd but still imposes
-       subgroup commit as pre-req to generating KPs.  Also grows PCS
-       window for KP to subgroup commit time instead of actual KP
-       generation time.  No App Msg needed (because uses commit to
-       coordinate instead).
+   2.  Commit in subgroup anouncing new KP's KPSeedContext.  Get kp_seed
+       := FS-Export(KPSeedContext).  Use it to generate KP secrets.
+       Send KP to subgroup as app msg.  Con: subgroup commit needed to
+       generate KP.  Pro: PCS window for KP is tight; starts when KP
+       generated.
 
    TODO
 
