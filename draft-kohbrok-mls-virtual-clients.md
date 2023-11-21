@@ -46,6 +46,16 @@ We discuss technical challenges and propose a concrete scheme that allows a
 group of clients to emulate a virtual client that can participate in one or more
 MLS groups.
 
+# Tenets
+
+Guiding principles and goals to work towards in order of priority.
+
+- Minimize number of required commits. Especially, interdependent ones across groups.
+- Simplicity & clarity > efficiency
+- Real vs. virtual client members look the same to the rest of the group.
+- Compatible with standard MLS DS.
+- Virtual clients should look like real clients to the DS.
+
 # Terminology
 
 - Client: Any MLS client including emulator clients, virtual clients and real
@@ -75,13 +85,13 @@ now, it’s virtual client emulation.
 
 A set of emulator clients that want to emulate one or more virtual clients form an MLS heirarchical group G. To act as a virtual client R representing G the emulating clients in G must each learn all secret held by R. This includes secrets associated with R's key packages and leaf nodes in groups R is a member of. This is done by deriving any such secrets deterministically using seeds exported from G's key schedule. To help coordinate this, the emulator client that first creates a representative R of group G assigns R a virtual client ID unique among all representatives of G. Similarly, as part of their creation, each key package of R is assigned an ID unique among all key packages generated for R using the same epoch's key schedule.
 
-Virtual clients R can join or create any group S just like real clients. When this ocures, G becomes a subgroup of supergroup S and R is G's representative in S. G may have 0 or more representatives which can each be a member of 0 or more supergroups. However, G can have at most 1 representative in a supergroup S.
+Just like real clients, a virtual client R can join or create any group S and even be an emulator client for some other virtual client. If R joins a group S then this makes G a subgroup of supergroup S and with R being G's representative in S. G may have 0 or more representatives which can each be a member of 0 or more supergroups. However, G can have at most 1 representative in a supergroup S.
 
 ## Generating Virtual Client Secrets
 For each epoch in G members use the Safe API's FS-Export method to obtain the virtual_client_seed for the epoch.
 
 ~~~~
-virtual_client_seed = MLS-Export("Virtual Client Seed", "", HKDF.Nh)
+virtual_client_seed = MLS-FS-Export("Virtual Client Seed", "", HKDF.Nh)
 ~~~~
 
 Later, they derive further seeds from virtual using the following context struct.
@@ -89,26 +99,107 @@ Later, they derive further seeds from virtual using the following context struct
 ~~~~
 struct {
   uint16 virtual_client_ID;
-  opaque context
+  uint32 emulator_client_leaf_index;
+  opaque emulator_group_context_hash;
+  opaque extended_context
 } VClientSeedContext
 
 seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSeedContext)
 ~~~~
 
 OPEN QUESTION
-- Is there any point to useing Safe API's FS-Exporter here? Maybe for the flow: Gen KP. KP used for Welcome msg. Process Welcome to join supergroup S. Delete init_key sk. Now we want FS for init_key to kick in immediatly (i.e. without having to first move G to a new epoch to clear out its exporter_secret.) ATM I'm not sure how to do this with out a PPRF... The hard part is giving emulator clients the ability to generate future KP secrets while also makeing sure that we get FS for those secrets when they are deleted again all within the same epoch of G. FS-Exporter + PPRF solves this but thats probably a bit heavy, at least if we want to avoid collisions when different emulator clients concurrently generate KPs.
+
+- Reasons why we should use FS-Exporter(), not Exporter(): Want to ensure immediate FS when sks derived from seeds deleted with out requireing subgroup commit just to erase exporter_secret. Scenario 1: Gen KP. KP used for Welcome msg. Process Welcome to join supergroup S. Delete init_key sk. Now we want FS for init_key to kick in immediatly (i.e. without having to first move G to a new epoch to clear out its exporter_secret.) Scenario 2: Commit in supergroup to get leaf node LN1. Gen update for supergroup. Update commited in supergroup to get leafe node LN2. Delete LF1 sks. We want FS for LF1 without needing a commit in subgroup to force delete exporter_secret.
+
+- Do we care if two emulator clients produce the same commits or proposals concurrently but with different signatures and nonce-reuse guard? Similar question for one emulator client producing two similar KPs or updates. I dont think its a security issue? Just a bit messy. Could reveal that a client is virtual not real though? If we do care then could add emulator client's leaf_index and a seed_counter to ReKeySeedContext. Mitigates problem because now seed collisions only possible under quite limited circumstances.
+
 - How to coordinate KeyPackage IDs? We could use an extension in the KP to signal its KPID to other emulator clients. But if we avoid that, then a virtual clients KP could look identical to that of a real client which would be cool. Maybe signal KPIDs for upcoming KP's in a commit to G? Seems robust (guarantees coordination and avoids collisions on KPIDs) but also a bit limiting. If decide I want to generate a new KP for a representative I now first have to commit in G but not for security, just to tell people the new KPID. But application msgs aren't even guaranteed to arrive so is that ok? Also should we use explicite KPIDs? or is it ok to use the init_key in the KP as the KPID?
 
 ## Key Package
 If this is a new representative then first choose VCID. Choose fresh KPID(s). Commit in G anouncing (VCID and) KPIDs privatly to the group. Generate KPs from new epochs key schedule using VCID and KPID in the context.
 
+~~~~
+struct {
+  uint16 key_package_ID;
+} KPSeedContext
+~~~~
+
+OPEN QUESTION
+
+- Not sure how to provide immediate FS for consumed virtual client key packages. Some strawmen designs I can think of right now are:
+
+   1. use FS-Exporter + PPRF alla MLS Secret Tree or
+
+   2. use MLS-Exporter + force subgroup commit when a KP consumed or
+
+   3. use FS-Export + generating a KP requires first anouncing to subgroup in a subgroup commit...
+
+ The hard part is minimizing the need for (subgroup) commits while ensuring immediate FS for consumed KPs. (1)-(3) solve this with different trade-offs. (1) imposes largest local state and compute cost but also requires no commits at all. (2) simpler but imposes commit dependency between super/sub groups which sucks IMO and probably makes FS for supergroup welcome msgs more complicated to ensure. What if subgroup commit fails for some reason? Which emulator client should issue subgroup commit to avoid "stampeding heard"? (3) Simpler & avoids stampeding heard but still imposes subgroup commit as pre-req to generating KPs.
+
+
+
+TODO
+
+- If the KPSeedContext struct ends up with just one uint16 in it we can remove it again and use the uint16 directly instead.
+
 ## Commits and Proposals in Supergroups.
 To commit as a representative in supergroup S, first commit in subgroup G. Next use new epoch's key schedule to derive new leaf node and path secret for representative's commit in S. In VClientSeedContext include S's GroupContext to avoid collisions between supergroups.
 
-- Do we care if two emulator clients produce similar commits concurrently? I dont think its a security issue, just a bit messy. Could reveal that a client is virtual not real though?
+~~~~
+struct {
+  uint8 rekey_seed[AEAD.Nk];
+  opaque supergroup_context_hash;
+} ReKeySeedContext
+~~~~
+
 
 ## Challenge-Based Application Messages.
-Needed so that emulator dont collide on key/nonce pairs when concurrently sending in a supergroup. See random-access mode in git branch app-msgs for details.
+Needed so that emulator clients dont collide on key/nonce pairs when concurrently sending in a supergroup. See random-access mode in git branch app-msgs for details.
+
+Application messages are used to send two types of information about to a. Either higher-level application data or information about an action taken by an emulator client on behalf of a group's representative. The following struct encodes application messages signaling their purpose to receivers.
+
+~~~~
+enum {
+  reserved(0),
+  virtual_client_info(1),
+  application_message(2),
+  (255)
+} ApplicationMessageType
+
+enum {
+  reserved(0),
+  key_package(1),
+  propsal(2),
+} VirtualClientAction
+
+struct {
+  ApplicationMessageType app_msg_type;
+  select (ApplicationMessage.app_msg_type) {
+    case application_message:
+      opaque application_data<V>;
+
+    case virtual_client_info:
+      VirtualClientAction virtual_client_action;
+      select (ApplicationMessage.virtual_client_action) {
+        case key_package:
+          KeyPackage key_package;
+          VClientSeedContext seed_context;
+
+        case propsal:
+          Proposal proposal
+          select (ApplicationMessage.propsal.proposal_type)
+            case update:  ReKeySeedContext rekey_seed_context;
+          }
+      }        
+  }
+} ApplicationMessage
+~~~~
+
+OPEN QUESTION
+
+- How should clients communicate about VirtClient commits, KPs, proposals, etc. E.g. if Alice creates a new KP for a virt client, what should she send about it the other emulator clients? the entire KP? just its KeyPackageRef? Or the specific parameters used to generate it (capabilities, ciphersuite, extensions,...). Sending entire KP to emulator group (e.g. as an app msgs) could mean better backwards compat with a standard MLS DS. (An MLS DS has no concept of "Give me a KP, but don't pop it from its queue" let alone something like "give me the KP with init_key X" or whatever.) On the other hand sending over whole KP to the emulator group could be very redundant. In many (most?) applications there's likely little to no choice when creating a KP besides sampling keys and the coins for the signature. So sending over the KPID and signatures for a new KP is enough for other emulator clients to reconstruct the entire KP locally for themselves.
+
+- Similar question for proposals.
 
 ## Adding and Removing Emulator Clients
 Send them the local states of all representativs of G encrypted in their welcome message. No action needs to be taken in any super group.
