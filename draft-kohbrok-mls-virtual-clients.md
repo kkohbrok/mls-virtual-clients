@@ -48,7 +48,7 @@ MLS groups.
 
 # Tenets
 
-Guiding principles and goals to work towards in order of priority.
+Guiding principles and goals to work towards.
 
 - Minimize number of required commits. Especially, interdependent ones across groups.
 - Simplicity & clarity > efficiency
@@ -85,7 +85,7 @@ now, it’s virtual client emulation.
 
 A set of emulator clients that want to emulate one or more virtual clients form an MLS heirarchical group G. To act as a virtual client R representing G the emulating clients in G must each learn all secret held by R. This includes secrets associated with R's key packages and leaf nodes in groups R is a member of. This is done by deriving any such secrets deterministically using seeds exported from G's key schedule. To help coordinate this, the emulator client that first creates a representative R of group G assigns R a virtual client ID unique among all representatives of G. Similarly, as part of their creation, each key package of R is assigned an ID unique among all key packages generated for R using the same epoch's key schedule.
 
-Just like real clients, a virtual client R can join or create any group S and even be an emulator client for some other virtual client. If R joins a group S then this makes G a subgroup of supergroup S and with R being G's representative in S. G may have 0 or more representatives which can each be a member of 0 or more supergroups. However, G can have at most 1 representative in a supergroup S.
+Just like real clients, a virtual client R can join or create any group S and even be an emulator client for some other virtual client. If R joins a group S then this makes G a subgroup of supergroup S and with R being G's representative in S. G may have 0 or more representatives which can each be a member of 0 or more supergroups. G and all of its supergroups MUST have unique group IDs. G can have at most 1 representative in a supergroup S.
 
 ## Generating Virtual Client Secrets
 For each epoch in G members use the Safe API's FS-Export method to obtain the virtual_client_seed for the epoch.
@@ -121,20 +121,27 @@ If this is a new representative then first choose VCID. Choose fresh KPID(s). Co
 ~~~~
 struct {
   uint16 key_package_ID;
+  opaque pre-seed[HKDF.Nh];
 } KPSeedContext
 ~~~~
 
-OPEN QUESTION
+OPEN QUESTIONS
 
-- Not sure how to provide immediate FS for consumed virtual client key packages. Some strawmen designs I can think of right now are:
+Not sure how to provide immediate FS for consumed virtual client key packages. Some strawmen designs I can think of right now are:
 
-   1. use FS-Exporter + PPRF alla MLS Secret Tree or
+   1. use FS-Exporter to get kp_tree_secret. Initilize a PPRF = MLS Secret Tree with root kp_tree_secret. Use PPRF(emulator_client_leaf, KP_generation) to get an FS key k. Set kp_seed := HKDF(k, pre-seed, VClientSeedContext) with fresh random pre-seed to get PCS for kp_seed. Generate KP secrets using kp_seed. delete k and kp_seed. At any time, delete KP secrets get immediate FS for the KP.
 
-   2. use MLS-Exporter + force subgroup commit when a KP consumed or
+   2. use MLS-Exporter with fresh random pre-seed as label to get kp_seed with PCS. Force subgroup commit when a KP consumed to ensure exporter_secret deleted for FS.
 
-   3. use FS-Export + generating a KP requires first anouncing to subgroup in a subgroup commit...
+   3. use FS-Export to get kp_seed + generating a KP requires first anouncing to subgroup in a subgroup commit. PCS from subgroup commit PCS. FS because FS-Exporter.
 
- The hard part is minimizing the need for (subgroup) commits while ensuring immediate FS for consumed KPs. (1)-(3) solve this with different trade-offs. (1) imposes largest local state and compute cost but also requires no commits at all. (2) simpler but imposes commit dependency between super/sub groups which sucks IMO and probably makes FS for supergroup welcome msgs more complicated to ensure. What if subgroup commit fails for some reason? Which emulator client should issue subgroup commit to avoid "stampeding heard"? (3) Simpler & avoids stampeding heard but still imposes subgroup commit as pre-req to generating KPs.
+The hard part is minimizing the need for (subgroup) commits while ensuring immediate FS for consumed KPs. (1)-(3) solve this with different trade-offs:
+
+  1. imposes largest local state and compute cost but also requires no commits and has optimal PCFS for KPs. Requires subgroup App Msgs (or somethign similar) to coordinate when KPs generated.
+
+  2. simpler than 1. but imposes commit dependency between super/sub groups. Probably makes FS for supergroup welcome msgs more complicated to ensure. What if subgroup commit fails for some reason? Which emulator client should issue subgroup commit to avoid "stampeding herd"? requires subgroup App Msg to coordinate secrets when KP created.
+
+  3. simpler than 1. & avoids stampeding herd but still imposes subgroup commit as pre-req to generating KPs. Also grows PCS window for KP to subgroup commit time instead of actual KP generation time. No App Msg needed (because uses commit to coordinate instead).
 
 
 
@@ -142,8 +149,8 @@ TODO
 
 - If the KPSeedContext struct ends up with just one uint16 in it we can remove it again and use the uint16 directly instead.
 
-## Commits and Proposals in Supergroups.
-To commit as a representative in supergroup S, first commit in subgroup G. Next use new epoch's key schedule to derive new leaf node and path secret for representative's commit in S. In VClientSeedContext include S's GroupContext to avoid collisions between supergroups.
+## Commits in Supergroups.
+To commit as a representative in supergroup S, first commit in subgroup G. Next use new epoch's FS-Exporter to derive new leaf node and path secret for representative's commit in S. In VClientSeedContext include S's GroupContext to avoid collisions between supergroups.
 
 ~~~~
 struct {
@@ -152,6 +159,26 @@ struct {
 } ReKeySeedContext
 ~~~~
 
+OPEN QUESTIONS
+
+- How can clients send private and authenticated extension-specific data along with a commit? Maybe Safe API can give wrap authenticated_data in FramedContent to give extensions a safe way to do this? E.g. we want to communicate "This subgroup commit creates an epoch from which I'm deriving the seeds for a virtual client R in supergroup G with commit
+
+## Update Proposals in Supergroups.
+
+OPEN QUESTIONS
+
+- Raises similar questions as for KPs. How to minimize commits while getting PFCS for leaf_node in Updates.
+
+### Sub-goup Membership Change
+Commits in subgroup are just like for MLS with the following additions.
+
+- Privately send all representatives' states to new members in welcome message.
+
+- When removing subgroup members MUST expire all representatives' secrets. KP's deleted (and replaced). Commits (or updates) in all supergroups. (pfui!) Security Consideration: Remove from subgroup not complete until all old KP's revoked, supergroup commits done, and update proposals commited too in supergroup.
+
+OPEN QUESTIONS
+
+- What to do about external joins? "clients obtain representatives' states out-of-band"? external joiners can revoke & replace reprsentatives' KPs?
 
 ## Challenge-Based Application Messages.
 Needed so that emulator clients dont collide on key/nonce pairs when concurrently sending in a supergroup. See random-access mode in git branch app-msgs for details.
@@ -190,12 +217,12 @@ struct {
           select (ApplicationMessage.propsal.proposal_type)
             case update:  ReKeySeedContext rekey_seed_context;
           }
-      }        
+      }
   }
 } ApplicationMessage
 ~~~~
 
-OPEN QUESTION
+OPEN QUESTIONS
 
 - How should clients communicate about VirtClient commits, KPs, proposals, etc. E.g. if Alice creates a new KP for a virt client, what should she send about it the other emulator clients? the entire KP? just its KeyPackageRef? Or the specific parameters used to generate it (capabilities, ciphersuite, extensions,...). Sending entire KP to emulator group (e.g. as an app msgs) could mean better backwards compat with a standard MLS DS. (An MLS DS has no concept of "Give me a KP, but don't pop it from its queue" let alone something like "give me the KP with init_key X" or whatever.) On the other hand sending over whole KP to the emulator group could be very redundant. In many (most?) applications there's likely little to no choice when creating a KP besides sampling keys and the coins for the signature. So sending over the KPID and signatures for a new KP is enough for other emulator clients to reconstruct the entire KP locally for themselves.
 

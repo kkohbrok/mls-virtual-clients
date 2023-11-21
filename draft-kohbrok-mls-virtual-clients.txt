@@ -58,18 +58,20 @@ Table of Contents
    4.  Client emulation
      4.1.  Generating Virtual Client Secrets
      4.2.  Key Package
-     4.3.  Commits and Proposals in Supergroups.
-     4.4.  Challenge-Based Application Messages.
-     4.5.  Adding and Removing Emulator Clients
-     4.6.  Example protocol flow
-     4.7.  DS/AS Details
-     4.8.  Agreement on/generation of key material
-     4.9.  Coordinating virtual client operations
-     4.10. Possible message re-ordering
-     4.11. Adding emulator clients
-     4.12. Sending application messages
-       4.12.1.  PPRF-based Challenges
-     4.13. Rotation of authentication key material
+     4.3.  Commits in Supergroups.
+     4.4.  Update Proposals in Supergroups.
+       4.4.1.  Sub-goup Membership Change
+     4.5.  Challenge-Based Application Messages.
+     4.6.  Adding and Removing Emulator Clients
+     4.7.  Example protocol flow
+     4.8.  DS/AS Details
+     4.9.  Agreement on/generation of key material
+     4.10. Coordinating virtual client operations
+     4.11. Possible message re-ordering
+     4.12. Adding emulator clients
+     4.13. Sending application messages
+       4.13.1.  PPRF-based Challenges
+     4.14. Rotation of authentication key material
    5.  Security considerations
    6.  Privacy considerations
    7.  Performance considerations
@@ -98,7 +100,7 @@ Table of Contents
 
 2.  Tenets
 
-   Guiding principles and goals to work towards in order of priority.
+   Guiding principles and goals to work towards.
 
    *  Minimize number of required commits.  Especially, interdependent
       ones across groups.
@@ -168,7 +170,8 @@ Table of Contents
    If R joins a group S then this makes G a subgroup of supergroup S and
    with R being G's representative in S.  G may have 0 or more
    representatives which can each be a member of 0 or more supergroups.
-   However, G can have at most 1 representative in a supergroup S.
+   G and all of its supergroups MUST have unique group IDs.  G can have
+   at most 1 representative in a supergroup S.
 
 4.1.  Generating Virtual Client Secrets
 
@@ -235,41 +238,61 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
 
    struct {
      uint16 key_package_ID;
+     opaque pre-seed[HKDF.Nh];
    } KPSeedContext
 
-   OPEN QUESTION
+   OPEN QUESTIONS
 
-   *  Not sure how to provide immediate FS for consumed virtual client
-      key packages.  Some strawmen designs I can think of right now are:
+   Not sure how to provide immediate FS for consumed virtual client key
+   packages.  Some strawmen designs I can think of right now are:
 
-      1.  use FS-Exporter + PPRF alla MLS Secret Tree or
+   1.  use FS-Exporter to get kp_tree_secret.  Initilize a PPRF = MLS
+       Secret Tree with root kp_tree_secret.  Use
+       PPRF(emulator_client_leaf, KP_generation) to get an FS key k.
+       Set kp_seed := HKDF(k, pre-seed, VClientSeedContext) with fresh
+       random pre-seed to get PCS for kp_seed.  Generate KP secrets
+       using kp_seed. delete k and kp_seed.  At any time, delete KP
+       secrets get immediate FS for the KP.
 
-      2.  use MLS-Exporter + force subgroup commit when a KP consumed or
+   2.  use MLS-Exporter with fresh random pre-seed as label to get
+       kp_seed with PCS.  Force subgroup commit when a KP consumed to
+       ensure exporter_secret deleted for FS.
 
-      3.  use FS-Export + generating a KP requires first anouncing to
-          subgroup in a subgroup commit...
+   3.  use FS-Export to get kp_seed + generating a KP requires first
+       anouncing to subgroup in a subgroup commit.  PCS from subgroup
+       commit PCS.  FS because FS-Exporter.
 
    The hard part is minimizing the need for (subgroup) commits while
    ensuring immediate FS for consumed KPs. (1)-(3) solve this with
-   different trade-offs. (1) imposes largest local state and compute
-   cost but also requires no commits at all. (2) simpler but imposes
-   commit dependency between super/sub groups which sucks IMO and
-   probably makes FS for supergroup welcome msgs more complicated to
-   ensure.  What if subgroup commit fails for some reason?  Which
-   emulator client should issue subgroup commit to avoid "stampeding
-   heard"? (3) Simpler & avoids stampeding heard but still imposes
-   subgroup commit as pre-req to generating KPs.
+   different trade-offs:
+
+   1.  imposes largest local state and compute cost but also requires no
+       commits and has optimal PCFS for KPs.  Requires subgroup App Msgs
+       (or somethign similar) to coordinate when KPs generated.
+
+   2.  simpler than 1. but imposes commit dependency between super/sub
+       groups.  Probably makes FS for supergroup welcome msgs more
+       complicated to ensure.  What if subgroup commit fails for some
+       reason?  Which emulator client should issue subgroup commit to
+       avoid "stampeding herd"? requires subgroup App Msg to coordinate
+       secrets when KP created.
+
+   3.  simpler than 1. & avoids stampeding herd but still imposes
+       subgroup commit as pre-req to generating KPs.  Also grows PCS
+       window for KP to subgroup commit time instead of actual KP
+       generation time.  No App Msg needed (because uses commit to
+       coordinate instead).
 
    TODO
 
    *  If the KPSeedContext struct ends up with just one uint16 in it we
       can remove it again and use the uint16 directly instead.
 
-4.3.  Commits and Proposals in Supergroups.
+4.3.  Commits in Supergroups.
 
    To commit as a representative in supergroup S, first commit in
-   subgroup G.  Next use new epoch's key schedule to derive new leaf
-   node and path secret for representative's commit in S.  In
+   subgroup G.  Next use new epoch's FS-Exporter to derive new leaf node
+   and path secret for representative's commit in S.  In
    VClientSeedContext include S's GroupContext to avoid collisions
    between supergroups.
 
@@ -278,7 +301,43 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
      opaque supergroup_context_hash;
    } ReKeySeedContext
 
-4.4.  Challenge-Based Application Messages.
+   OPEN QUESTIONS
+
+   *  How can clients send private and authenticated extension-specific
+      data along with a commit?  Maybe Safe API can give wrap
+      authenticated_data in FramedContent to give extensions a safe way
+      to do this?  E.g. we want to communicate "This subgroup commit
+      creates an epoch from which I'm deriving the seeds for a virtual
+      client R in supergroup G with commit
+
+4.4.  Update Proposals in Supergroups.
+
+   OPEN QUESTIONS
+
+   *  Raises similar questions as for KPs.  How to minimize commits
+      while getting PFCS for leaf_node in Updates.
+
+4.4.1.  Sub-goup Membership Change
+
+   Commits in subgroup are just like for MLS with the following
+   additions.
+
+   *  Privately send all representatives' states to new members in
+      welcome message.
+
+   *  When removing subgroup members MUST expire all representatives'
+      secrets.  KP's deleted (and replaced).  Commits (or updates) in
+      all supergroups. (pfui!)  Security Consideration: Remove from
+      subgroup not complete until all old KP's revoked, supergroup
+      commits done, and update proposals commited too in supergroup.
+
+   OPEN QUESTIONS
+
+   *  What to do about external joins? "clients obtain representatives'
+      states out-of-band"? external joiners can revoke & replace
+      reprsentatives' KPs?
+
+4.5.  Challenge-Based Application Messages.
 
    Needed so that emulator clients dont collide on key/nonce pairs when
    concurrently sending in a supergroup.  See random-access mode in git
@@ -307,25 +366,25 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
      ApplicationMessageType app_msg_type;
      select (ApplicationMessage.app_msg_type) {
        case application_message:
-             opaque application_data<V>;
+         opaque application_data<V>;
 
        case virtual_client_info:
-             VirtualClientAction virtual_client_action;
-             select (ApplicationMessage.virtual_client_action) {
+         VirtualClientAction virtual_client_action;
+         select (ApplicationMessage.virtual_client_action) {
            case key_package:
-                 KeyPackage key_package;
+             KeyPackage key_package;
              VClientSeedContext seed_context;
 
            case propsal:
              Proposal proposal
              select (ApplicationMessage.propsal.proposal_type)
-                   case update:  ReKeySeedContext rekey_seed_context;
+               case update:  ReKeySeedContext rekey_seed_context;
              }
          }
      }
    } ApplicationMessage
 
-   OPEN QUESTION
+   OPEN QUESTIONS
 
    *  How should clients communicate about VirtClient commits, KPs,
       proposals, etc.  E.g. if Alice creates a new KP for a virt client,
@@ -346,19 +405,19 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
 
    *  Similar question for proposals.
 
-4.5.  Adding and Removing Emulator Clients
+4.6.  Adding and Removing Emulator Clients
 
    Send them the local states of all representativs of G encrypted in
    their welcome message.  No action needs to be taken in any super
    group.
 
-4.6.  Example protocol flow
+4.7.  Example protocol flow
 
    TODO: Go through a full flow, where both sender and receiver are
    virtual clients.  Include both communication in the higher-level
    group and in the emulation group.
 
-4.7.  DS/AS Details
+4.8.  DS/AS Details
 
    Virtual client emulation should be largely agnostic to specific
    details of the AS and DS of the application.  However, a few
@@ -373,7 +432,7 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
       workarounds like one emulator client retrieving messages and then
       sending them to the emulation group are possible.)
 
-4.8.  Agreement on/generation of key material
+4.9.  Agreement on/generation of key material
 
    Agreement on key material is one of the primary features of MLS and
    the emulator clients can simply export secrets from the emulation
@@ -390,7 +449,7 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
 
    TODO: Be more explicit on how the randomness is exported.
 
-4.9.  Coordinating virtual client operations
+4.10.  Coordinating virtual client operations
 
    Generally, emulator clients should coordinate the actions taken by
    the virtual client.  This is, for example, to prevent multiple
@@ -405,7 +464,7 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
    that affect more than one higher-level group (such as credential
    updates, depending on the AS).
 
-4.10.  Possible message re-ordering
+4.11.  Possible message re-ordering
 
    One difficulty in coordinating the use of randomness exported from
    the emulation group is that we cannot assume that messages arrive in
@@ -442,7 +501,7 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
 
    *  LeafNode extension (leaks metadata to higher-level groups)
 
-4.11.  Adding emulator clients
+4.12.  Adding emulator clients
 
    If a client is added to the emulation group, it has to be provisioned
    with the private key material and the group states of all higher-
@@ -464,7 +523,7 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
    via external commit, except if said secrets are provided
    asynchronously.
 
-4.12.  Sending application messages
+4.13.  Sending application messages
 
    Open Question: Key material for encryption/decryption of application
    messages is used only once.  Since there is no ordering of
@@ -491,7 +550,7 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
       defines its own application message (if a new secret tree is
       used))
 
-4.12.1.  PPRF-based Challenges
+4.13.1.  PPRF-based Challenges
 
    Key/nonce pairs used to encrypt application messages are derived
    using a PPRF.  That is, the Secret Tree in the super group is
@@ -539,7 +598,7 @@ seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSee
    8b-4 bytes of overhead in application messages and added random bits
    when sending.
 
-4.13.  Rotation of authentication key material
+4.14.  Rotation of authentication key material
 
    If the design of the AS specifies the use of cross-group
    authentication key material, emulator clients must coordinate the
