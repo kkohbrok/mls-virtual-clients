@@ -38,9 +38,11 @@ material. In this document, we propose the notion of a virtual client that is
 jointly emulated by a group of emulator clients, where each emulator client
 holds the key material necessary to act as the virtual client.
 
-Depending on the use case, the use of virtual clients can lead to performance
-increases and hide metadata from the DS and other group members. On the other
-hand, it introduces complexity and additional operational requirements.
+The use of a virtual client allows multiple distinct clients to be represented
+by a single leaf in an MLS group. This pattern of shared group membership
+provides a new way for applications to structure groups, can improve performance
+and help hide group metadata. The effect of the use of virtual clients depends
+largely on how it is applied (see {{applications}}).
 
 We discuss technical challenges and propose a concrete scheme that allows a
 group of clients to emulate a virtual client that can participate in one or more
@@ -58,6 +60,75 @@ MLS groups.
 TODO: Terminology is up for debate. We’ve sometimes called this “user trees”,
 but since there are other use cases, we should choose a more neutral name. For
 now, it’s virtual client emulation.
+
+# Applications
+
+Virtual clients generally allow multiple emulator clients to share membership in
+an MLS group, where the virtual client is represented as a single leaf. This is
+in contrast to the case where each individual emulator client is a regular
+member of the group, each with its own leaf.
+
+Depending on the application, the use of virtual clients can have different
+effects. However, in all cases, virtual client emulation introduces a small
+amount of overhead for the emulator clients and certain limitations (see
+{{limitations}}).
+
+## Virtual clients for performance
+
+If a group of emulator clients emulate a virtual client in more than one group,
+the overhead caused by the emulation process can be outweighed by two
+performance benefits.
+
+On the one hand, the use of virtual clients makes the higher-level groups (in
+which the virtual client is a member) smaller. Instead of one leaf for each
+emulator client, it only has a single leaf for the virtual client. As the
+complexity of most MLS operations depends on the number of group members, this
+increases performance for all members of that group.
+
+At the same time, the virtual client emulation process (see
+{{client-emulation}}) allows emulator clients to carry the benefit of a single
+operation in the emulation group to all virtual clients emulated in that group.
+
+## Hidden subgroups
+
+Virtual clients can be used to hide the emulator clients from other members of
+higher-level groups. For example, removing group members of the emulator group
+will only be visible in the higher-level group as a regular group update.
+Similarly, when an emulator client wants to send a message in a higher-level
+group, recipients will see the virtual client as the sender and won't be able to
+discern which emulator client sent the message, or indeed the fact that the
+sender is a virtual client at all.
+
+Hiding emulator clients behind their virtual client(s) can, for example, hide
+the number of devices a human user has, or which device the user is sending
+messages from.
+
+As hiding of emulator clients by design obfuscates the membership in
+higher-level groups, it also means that other higher-level group members can't
+identify the actual senders and recipients of messages. From the point of view
+of other group members, the "end" of the end-to-end encryption and
+authentication provided by MLS ends with the virtual client. The relevance of
+this fact largely depends on the security goals of the application and the
+design of the authentication service.
+
+If the virtual is used to hide the emulator clients, the delivery service and
+other higher-level group members also lose the ability to enforce policies to
+evict stale clients. For example, an emulator client could become stale (i.e.
+inactive), while another keeps sending updates. From the point of view of the
+higher-level group, the virtual client would remain active.
+
+## Transparent subgroups
+
+TODO: The following text assumes that we have some mechanism of adding one or
+more additional signatures to MLS messages.
+
+While applications can choose to use virtual clients to hide the corresponding
+emulator clients, they don't have to. When using the virtual client to send
+messages, the sending emulator client can provide an addition signature using
+either its leaf credential in the emulation group, or another AS-provided
+credential that allows higher-level group members to authenticate the message.
+
+# Limitations
 
 # Client emulation
 
