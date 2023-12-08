@@ -130,6 +130,11 @@ credential that allows higher-level group members to authenticate the message.
 
 # Limitations
 
+The use of virtual clients comes with a few limitations when compared to MLS,
+where all emulator clients are themselves members of the higher-level groups.
+
+## External remove proposals
+
 In some cases, it is desirable for an external sender (e.g. the messaging
 provider of a user) to be able to propose the removal an individual
 (non-virtual) client from a group without requiring another client of the same
@@ -148,9 +153,32 @@ removal in the emulation group).
 
 Another possibility would be for emulator clients to provision KeyPackages for
 which only a subset of emulator clients have access to. The external sender
-could then propose an update of the virtual client using one of the KeyPackages.
-Note that this approach would require an(other) MLS extension, as MLS doesn't
-allow the proposal of updates by anyone else than the updated party.
+could then propose the removal of the virtual client, coupled with the immediate
+addition of a new one using one of the KeyPackages.
+
+## External joins
+
+When there are no subgroups and all (emulator) clients are members of each
+higher-level group, new (emulator) clients would be able to join via external
+commit without influencing the operation of any other emulator client and
+without requiring another emulator client to be online.
+
+When using virtual clients and a client wishes to externally join the emulator
+group, it will not have immediate access to the secrets of the virtual clients
+associated with that group.
+
+This can be remedied either by another (online) emulator client providing it
+with the necessary secrets, or by the new emulator client having the virtual
+client rejoin all higher-level groups.
+
+While the first option has the benefit of not requiring an external commit in
+any higher-level groups (thus reducing overhead), it strictly requires another
+emulator client to be online.
+
+The second option on the other hand additionally requires the new emulator
+client to re-upload all KeyPackages of the virtual client, thus further
+increasing the difficulty of coordinating actions between emulation group and
+higher-level groups.
 
 # Client emulation
 
