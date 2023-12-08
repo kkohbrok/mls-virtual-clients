@@ -111,7 +111,7 @@ authentication provided by MLS ends with the virtual client. The relevance of
 this fact largely depends on the security goals of the application and the
 design of the authentication service.
 
-If the virtual is used to hide the emulator clients, the delivery service and
+If the virtual client is used to hide the emulator clients, the delivery service and
 other higher-level group members also lose the ability to enforce policies to
 evict stale clients. For example, an emulator client could become stale (i.e.
 inactive), while another keeps sending updates. From the point of view of the
