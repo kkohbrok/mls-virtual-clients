@@ -130,6 +130,28 @@ credential that allows higher-level group members to authenticate the message.
 
 # Limitations
 
+In some cases, it is desirable for an external sender (e.g. the messaging
+provider of a user) to be able to propose the removal an individual
+(non-virtual) client from a group without requiring another client of the same
+user to be online. Doing so would allow another client to commit to said remove
+proposal and thus remove the client in question from the group.
+
+This is not possible when using virtual clients. Here, the non-virtual client
+would be the emulator client of a virtual client in a higher-level group. While
+the server could propose the removal of the client from the emulation group,
+this would not effectively remove the client's access to the higher-level groups
+in which the virtual client is a member.
+
+For such a removal to take place, another emulator client would have to be
+online to update the key material of the virtual client (in addition to the
+removal in the emulation group).
+
+Another possibility would be for emulator clients to provision KeyPackages for
+which only a subset of emulator clients have access to. The external sender
+could then propose an update of the virtual client using one of the KeyPackages.
+Note that this approach would require an(other) MLS extension, as MLS doesn't
+allow the proposal of updates by anyone else than the updated party.
+
 # Client emulation
 
 To emulate a virtual client, the emulator clients need to agree on the key
