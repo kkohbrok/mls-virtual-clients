@@ -136,7 +136,7 @@ where all emulator clients are themselves members of the higher-level groups.
 ## External remove proposals
 
 In some cases, it is desirable for an external sender (e.g. the messaging
-provider of a user) to be able to propose the removal an individual
+provider of a user) to be able to propose the removal of an individual
 (non-virtual) client from a group without requiring another client of the same
 user to be online. Doing so would allow another client to commit to said remove
 proposal and thus remove the client in question from the group.
