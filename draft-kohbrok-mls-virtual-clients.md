@@ -176,7 +176,8 @@ While the first option has the benefit of not requiring an external commit in
 any higher-level groups (thus reducing overhead), it either requires another
 emulator client to be online to share the necessary secrets directly, or a way
 for the new emulator client to retrieve the necessary without the help of
-another client.
+another client. The latter can be achieved, for example, by encrypting the
+relevant secrets such that the new client can retrieve and decrypt them.
 
 The second option on the other hand additionally requires the new emulator
 client to re-upload all KeyPackages of the virtual client, thus further
