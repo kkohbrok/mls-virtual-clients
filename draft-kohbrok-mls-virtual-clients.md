@@ -167,13 +167,16 @@ When using virtual clients and a client wishes to externally join the emulator
 group, it will not have immediate access to the secrets of the virtual clients
 associated with that group.
 
-This can be remedied either by another (online) emulator client providing it
-with the necessary secrets, or by the new emulator client having the virtual
-client rejoin all higher-level groups.
+This can be remedied via one of the following options:
+
+- Another emulator client could provide it with the necessary secrets
+- The new emulator client could have the virtual client rejoin all higher-level groups
 
 While the first option has the benefit of not requiring an external commit in
-any higher-level groups (thus reducing overhead), it strictly requires another
-emulator client to be online.
+any higher-level groups (thus reducing overhead), it either requires another
+emulator client to be online to share the necessary secrets directly, or a way
+for the new emulator client to retrieve the necessary without the help of
+another client.
 
 The second option on the other hand additionally requires the new emulator
 client to re-upload all KeyPackages of the virtual client, thus further
