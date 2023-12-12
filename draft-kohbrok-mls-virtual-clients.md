@@ -68,12 +68,6 @@ clients to achieve both of these tasks is to create an MLS group which we call
 the emulation group. In contrast, we call any group that the virtual client is a
 member of a higher-level group.
 
-## Example protocol flow
-
-TODO: Go through a full flow, where both sender and receiver are virtual
-clients. Include both communication in the higher-level group and in the
-emulation group.
-
 ## DS/AS Details
 
 Virtual client emulation should be largely agnostic to specific details of the
@@ -111,10 +105,18 @@ uploading KeyPackages simultaneously.
 However, emulator clients do not have to coordinate all actions taken by the
 virtual client. Specifically, commits in a single higher-level group can be sent
 without the risk of desynchronization between the emulator clients, as the
-group’s DS will enforce message ordering. Coordination is thus required for
-non-commit messages (specifically proposals and application messages), as well
-as actions that affect more than one higher-level group (such as credential
-updates, depending on the AS).
+group’s DS will enforce message ordering. Coordination is thus required actions
+that affect more than one higher-level group (such as credential updates,
+depending on the AS, as well as KeyPackage publishing/updates).
+
+OPEN QUESTION: There are multiple ways for emulator clients to coordinate
+through the emulation group. Commits in the emulation group ensure that there is
+a strict order of virtual client actions that emulator clients agree on
+(although that might not be necessary for every action, see above). In that
+case, details of the virtual client action could be included in the AAD of the
+commit. Emulator clients can also send application messages in the emulation
+group to announce a virtual client action, which has the advantage of being less
+costly.
 
 ## Possible message re-ordering
 
@@ -238,6 +240,33 @@ If the design of the AS specifies the use of cross-group authentication key
 material, emulator clients must coordinate the rotation of said key material in
 the emulation group to avoid multiple emulator clients rotating a key at the
 same time. Details depend on the design of the AS.
+
+## Example protocol flow
+
+Virtual clients can, for example, be used by users with multiple devices. Here,
+each device acts as an emulator client that emulates the virtual client which
+represents Alice towards other users.
+
+A group with Alice and Bob would thus still only have two members, regardless of
+the number of clients Alice and Bob have.
+
+Each of Alice's devices would thus keep the state of one emulator client, as
+well as the virtual client jointly emulated by all of Alice's clients.
+
+If one of Alice's devices wanted to update its key material to achieve
+post-compromise security, it would first perform a commit in the emulation
+group, both to signal the action to other emulator clients and to update the key
+material from which the randomness for the virtual client is sampled. From the
+updated emulation group, the emulator client would then export the randomness to
+perform an update in each group in which Alice (through the virtual client) is a
+member.
+
+Alice's other clients would receive and process the commit in the emulation
+group. Using the information included about the virtual client operation, they
+also update their virtual client state.
+
+Bob (or other members in the higher level group) will only see the update in the
+higher-level group, which they can simply process with their (virtual) clients.
 
 # Security considerations
 
