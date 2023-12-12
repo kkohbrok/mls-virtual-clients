@@ -38,9 +38,11 @@ material. In this document, we propose the notion of a virtual client that is
 jointly emulated by a group of emulator clients, where each emulator client
 holds the key material necessary to act as the virtual client.
 
-Depending on the use case, the use of virtual clients can lead to performance
-increases and hide metadata from the DS and other group members. On the other
-hand, it introduces complexity and additional operational requirements.
+The use of a virtual client allows multiple distinct clients to be represented
+by a single leaf in an MLS group. This pattern of shared group membership
+provides a new way for applications to structure groups, can improve performance
+and help hide group metadata. The effect of the use of virtual clients depends
+largely on how it is applied (see {{applications}}).
 
 We discuss technical challenges and propose a concrete scheme that allows a
 group of clients to emulate a virtual client that can participate in one or more
@@ -58,6 +60,129 @@ MLS groups.
 TODO: Terminology is up for debate. We’ve sometimes called this “user trees”,
 but since there are other use cases, we should choose a more neutral name. For
 now, it’s virtual client emulation.
+
+# Applications
+
+Virtual clients generally allow multiple emulator clients to share membership in
+an MLS group, where the virtual client is represented as a single leaf. This is
+in contrast to the case where each individual emulator client is a regular
+member of the group, each with its own leaf.
+
+Depending on the application, the use of virtual clients can have different
+effects. However, in all cases, virtual client emulation introduces a small
+amount of overhead for the emulator clients and certain limitations (see
+{{limitations}}).
+
+## Virtual clients for performance
+
+If a group of emulator clients emulate a virtual client in more than one group,
+the overhead caused by the emulation process can be outweighed by two
+performance benefits.
+
+On the one hand, the use of virtual clients makes the higher-level groups (in
+which the virtual client is a member) smaller. Instead of one leaf for each
+emulator client, it only has a single leaf for the virtual client. As the
+complexity of most MLS operations depends on the number of group members, this
+increases performance for all members of that group.
+
+At the same time, the virtual client emulation process (see
+{{client-emulation}}) allows emulator clients to carry the benefit of a single
+operation in the emulation group to all virtual clients emulated in that group.
+
+## Hidden subgroups
+
+Virtual clients can be used to hide the emulator clients from other members of
+higher-level groups. For example, removing group members of the emulator group
+will only be visible in the higher-level group as a regular group update.
+Similarly, when an emulator client wants to send a message in a higher-level
+group, recipients will see the virtual client as the sender and won't be able to
+discern which emulator client sent the message, or indeed the fact that the
+sender is a virtual client at all.
+
+Hiding emulator clients behind their virtual client(s) can, for example, hide
+the number of devices a human user has, or which device the user is sending
+messages from.
+
+As hiding of emulator clients by design obfuscates the membership in
+higher-level groups, it also means that other higher-level group members can't
+identify the actual senders and recipients of messages. From the point of view
+of other group members, the "end" of the end-to-end encryption and
+authentication provided by MLS ends with the virtual client. The relevance of
+this fact largely depends on the security goals of the application and the
+design of the authentication service.
+
+If the virtual client is used to hide the emulator clients, the delivery service and
+other higher-level group members also lose the ability to enforce policies to
+evict stale clients. For example, an emulator client could become stale (i.e.
+inactive), while another keeps sending updates. From the point of view of the
+higher-level group, the virtual client would remain active.
+
+## Transparent subgroups
+
+TODO: The following text assumes that we have some mechanism of adding one or
+more additional signatures to MLS messages.
+
+While applications can choose to use virtual clients to hide the corresponding
+emulator clients, they don't have to. When using the virtual client to send
+messages, the sending emulator client can provide an addition signature using
+either its leaf credential in the emulation group, or another AS-provided
+credential that allows higher-level group members to authenticate the message.
+
+# Limitations
+
+The use of virtual clients comes with a few limitations when compared to MLS,
+where all emulator clients are themselves members of the higher-level groups.
+
+## External remove proposals
+
+In some cases, it is desirable for an external sender (e.g. the messaging
+provider of a user) to be able to propose the removal of an individual
+(non-virtual) client from a group without requiring another client of the same
+user to be online. Doing so would allow another client to commit to said remove
+proposal and thus remove the client in question from the group.
+
+This is not possible when using virtual clients. Here, the non-virtual client
+would be the emulator client of a virtual client in a higher-level group. While
+the server could propose the removal of the client from the emulation group,
+this would not effectively remove the client's access to the higher-level groups
+in which the virtual client is a member.
+
+For such a removal to take place, another emulator client would have to be
+online to update the key material of the virtual client (in addition to the
+removal in the emulation group).
+
+Another possibility would be for emulator clients to provision KeyPackages for
+which only a subset of emulator clients have access to. The external sender
+could then propose the removal of the virtual client, coupled with the immediate
+addition of a new one using one of the KeyPackages.
+
+## External joins
+
+When there are no subgroups and all (emulator) clients are members of each
+higher-level group, new (emulator) clients would be able to join via external
+commit without influencing the operation of any other emulator client and
+without requiring another emulator client to be online.
+
+When using virtual clients and a client wishes to externally join the emulator
+group, it will not have immediate access to the secrets of the virtual clients
+associated with that group.
+
+This can be remedied via one of the following options:
+
+- Another emulator client could provide it with the necessary secrets
+- The new emulator client could have the virtual client rejoin all higher-level groups
+
+While the first option has the benefit of not requiring an external commit in
+any higher-level groups (thus reducing overhead), it either requires another
+emulator client to be online to share the necessary secrets directly, or a way
+for the new emulator client to retrieve the necessary without the help of
+another client. The latter can be achieved, for example, by encrypting the
+relevant secrets such that the new client can retrieve and decrypt them.
+
+The second option on the other hand additionally requires the new emulator
+client to re-upload all KeyPackages of the virtual client, thus further
+increasing the difficulty of coordinating actions between emulation group and
+higher-level groups.
 
 # Client emulation
 
