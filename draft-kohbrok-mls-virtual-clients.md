@@ -12,6 +12,10 @@ stand_alone: yes
 pi: [toc, sortrefs, symrefs]
 
 author:
+ -  ins: J. Alwen
+    name: Joel Alwen
+	organization: AWS Wickr
+	email: alwenjo@amazon.com
  -  ins: K. Kohbrok
     name: Konrad Kohbrok
     organization: Phoenix R&D
@@ -48,12 +52,24 @@ MLS groups.
 
 # Terminology
 
-- Client: An MLS client
-- Virtual Client: A client the key material of which is held by one or more
-  (other) clients.
-- Emulator Client: A client that collaborates with other emulator clients in
-  emulating a virtual client. Emulator clients can themselves be virtual
+- Client: Any MLS client including emulator clients, virtual clients and real
   clients.
+- Real Client: An MLS client whose secret key material is held by a single
+  agent.
+- Virtual Client: A client for which the secret key material is held by one or
+  more other clients, each of which can act on behalf of the virtual client.
+- Emulator Client: A client that collaborates with other emulator clients in
+  emulating a virtual client. Emulator clients can be real or virtual clients.
+- Heirarchical group: A generalization of an MLS group in which members can be
+  either virtual or real clients. Heirarchical group members may also act as
+  emulator clients to collaboratively emulate a virtual client representing the
+  heirarchical group in one or more other heirarchical groups.
+- Group representative: A group representative of (heirarchical group) G is a
+  virtual client emulated by the clients in G. The group representative of group
+  G in another group S is the representative of G that is a member S.
+- Subgroup: a heirarchical group with a representative in one or more other
+  groups.
+- Supergroup: a heirarchical group with one or more virtual members.
 
 TODO: Terminology is up for debate. We’ve sometimes called this “user trees”,
 but since there are other use cases, we should choose a more neutral name. For
@@ -61,20 +77,56 @@ now, it’s virtual client emulation.
 
 # Client emulation
 
-To emulate a virtual client, the emulator clients need to agree on the key
-material held by the virtual client and coordinate the actions taken by the
-client in any group of which it is a member. The obvious way for the emulator
-clients to achieve both of these tasks is to create an MLS group which we call
-the emulation group. In contrast, we call any group that the virtual client is a
-member of a higher-level group.
+A set S of emulator clients that want to emulate one or more virtual clients must first form an MLS heirarchical group G with membership S. Emulator clients in S use G to coordinate their emulation of G's virtual clients. Just like real clients, a virtual client V can create, join or participate in any group S, even acting as an emulator client itself for some other virtual client. If V joins a group S then this makes G a subgroup of supergroup S and with V being G's representative in V. G may have 0 or more representatives which can each be a member of 0 or more supergroups. But G can have at most 1 representative in a given subgroup S. Emulating clients in G MUST ensure that G and all of its supergroups have distinct group IDs.
 
-## Example protocol flow
+An emulator client E in G creates a new virtual client V of G by assigning the V a fresh virtual client ID (unique among all virtual clients of G) and a signature key pair. The new creation of V, its ID and key pair are communicated to rest of G via a commit in G sent by E. As an invariant, emulator client's in G maintain a copy of the complete local MLS state of V. This includes all MLS related secrets currently held by V. Using this state, each emulator clients can independently process MLS messages sent to V to update their copy of V's state. Emulator client's in G can also act on behalf of V (subject to application policy) by taking a new action. Possible actions include anything an MLS client can perform such as generating and publishing a new key packages and sending commits, proposals, welcome messages or application messages. To help other members of G update their copies of V's state according to the action, E anounces the action using a commit to G. Any secrets created by E as part of implementing the action are generated deterministically by exporting seeds from G. This allows other emulator clients in G to reproduce the same secrets and update their own copies of the V's state maintaining the invariant.
+
+
+## Generating Virtual Client Secrets
+An emulator client V in a group G may sample four types of MLS-related secrets on behalf of a virtual client V which must be reproducable by the other clients in G: init_key KEM keys in KeyPackage structs, encryption_key KEM keys in LeafNode structs, path_secrets for an UpdatePath structs and signature key pairs. In each case, to do this V (and all other clients in G) do this by constructing an appropriate label for the new secret and exporting from G with the label. 
+
+For each epoch in G members use the Safe API's FS-Export method to obtain the virtual_client_seed for the epoch.
+
+~~~~
+virtual_client_seed = MLS-FS-Export("Virtual Client Seed", "", HKDF.Nh)
+~~~~
+
+Later, they derive further seeds from virtual using the following context struct.
+
+~~~~
+struct {
+  uint16 virtual_client_ID;
+  uint32 emulator_client_leaf_index;
+  opaque emulator_group_context_hash;
+  opaque extended_context
+} VClientSeedContext
+
+seed = ExpandWithLabel(virtual_client_seed, "Virtual Client Secrets", VClientSeedContext)
+~~~~
+
+OPEN QUESTION
+
+- Reasons why we should use FS-Exporter(), not Exporter(): Want to ensure immediate FS when sks derived from seeds deleted with out requireing subgroup commit just to erase exporter_secret. Scenario 1: Gen KP. KP used for Welcome msg. Process Welcome to join supergroup S. Delete init_key sk. Now we want FS for init_key to kick in immediatly (i.e. without having to first move G to a new epoch to clear out its exporter_secret.) Scenario 2: Commit in supergroup to get leaf node LN1. Gen update for supergroup. Update commited in supergroup to get leafe node LN2. Delete LF1 sks. We want FS for LF1 without needing a commit in subgroup to force delete exporter_secret.
+
+- Do we care if two emulator clients produce the same commits or proposals concurrently but with different signatures and nonce-reuse guard? Similar question for one emulator client producing two similar KPs or updates. I dont think its a security issue? Just a bit messy. Could reveal that a client is virtual not real though? If we do care then could add emulator client's leaf_index and a seed_counter to ReKeySeedContext. Mitigates problem because now seed collisions only possible under quite limited circumstances.
+
+- How to coordinate KeyPackage IDs? We could use an extension in the KP to signal its KPID to other emulator clients. But if we avoid that, then a virtual clients KP could look identical to that of a real client which would be cool. Maybe signal KPIDs for upcoming KP's in a commit to G? Seems robust (guarantees coordination and avoids collisions on KPIDs) but also a bit limiting. If decide I want to generate a new KP for a representative I now first have to commit in G but not for security, just to tell people the new KPID. But application msgs aren't even guaranteed to arrive so is that ok? Also should we use explicite KPIDs? or is it ok to use the init_key in the KP as the KPID?
+
+
+
+
+
+
+
+
+
+# Example protocol flow
 
 TODO: Go through a full flow, where both sender and receiver are virtual
 clients. Include both communication in the higher-level group and in the
 emulation group.
 
-## DS/AS Details
+# DS/AS Details
 
 Virtual client emulation should be largely agnostic to specific details of the
 AS and DS of the application. However, a few conditions must be met.
@@ -86,7 +138,12 @@ AS and DS of the application. However, a few conditions must be met.
   emulator client retrieving messages and then sending them to the emulation
   group are possible.)
 
-## Agreement on/generation of key material
+
+
+
+
+
+# Agreement on/generation of key material
 
 Agreement on key material is one of the primary features of MLS and the emulator
 clients can simply export secrets from the emulation group to provide the
