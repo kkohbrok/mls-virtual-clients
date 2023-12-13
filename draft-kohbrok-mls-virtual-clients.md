@@ -279,28 +279,31 @@ except if said secrets are provided asynchronously.
 ## Sending application messages
 
 MLS applications messages are encrypted using key material derived from the
-secret tree, where each key/nonce pair is uniquely derived for each message and
-deleted after a message was encrypted or decrypted.
+secret tree, where a unique key/nonce pair is derived for each message and
+irrevocably deleted after the message was encrypted or decrypted.
 
 This poses a problem in the context of virtual client emulation, because the use
-of such key material cannot easily be coordinated through the emulation group
-and multiple emulation clients using the same key material would leave
-recipients unable to decrypt the second of two messages.
+of such key material cannot easily be coordinated between emulating clients.
+However, reusing a key/nonce pair for different application messages leaks 
+information about the plaintexts. Moreover, any client receving the two would 
+not be able to decrypt the second message as the requisit key would already
+be deleted.
 
 ## Challenge-based application message encryption
 
-This problem can be solved by introducing a new type of application message the
-encryption keys for which are derived using a challenge based approach.
+This problem can be solved by introducing a new type of application message
+where the encryption keys are derived using a challenge-based approach.
 
 Using a forward-secret exporter secret (provided by the safe extension API),
 each member creates a new secret tree. Whenever a group member wants to send a
-message, it creates a unique challenge (see {{challenge generation}}), which it
-uses as input to a forward secure KDF (FS-KDF see {{forward-secure-kdf}}) seeded
-by the sender's leaf secret in the new secret tree. The FS-KDF's output secret
-is then used to derive the key/nonce for application message encryption. The
-sender then includes the challenge in the AAD of the application message.
-Finally, recipients follow the same process to derive the key material for
-decryption.
+message, it creates a fresh random challenge (see {{challenge generation}}) for 
+that message. Each challenge is mapped to its own secret using a forward-secure
+KDF implimented using a new secret tree (see {{forward-secure-kdf}}). The secret
+is used to derive the key/nonce used to encrypt a message. The sender includes 
+the challenge in the AAD of the application message so that receivers can also
+derive the decryption key. Finally, to ensure forward secrecy of the
+challenge-based application message both sender and recipients apply the same
+deletion schedule as for the standard secret tree in normal MLS.
 
 ### Challenge generation
 
