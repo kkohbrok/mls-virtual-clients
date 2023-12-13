@@ -13,10 +13,8 @@ pi: [toc, sortrefs, symrefs]
 
 author:
  -  ins: J. Alwen
-    name: Joel Alwen
-	organization: AWS Wickr
-	email: alwenjo@amazon.com
--  ins: K. Kohbrok
+    email: alwenjo@amazon.com
+ -  ins: K. Kohbrok
     name: Konrad Kohbrok
     organization: Phoenix R&D
     email: konrad.kohbrok@datashrine.de
@@ -203,7 +201,7 @@ higher-level groups.
 # Client emulation
 
 A set C of emulator clients that want to emulate one or more virtual clients
-must first form an MLS heirarchical group G with membership C. The emulator 
+must first form an MLS heirarchical group G with membership C. The emulator
 clients use G to coordinate their shared virtual clients. Just like real
 clients, a virtual client V can create, join or participate in any group S, even
 acting as an emulator client itself for some other virtual client. If V joins a
@@ -284,8 +282,8 @@ irrevocably deleted after the message was encrypted or decrypted.
 
 This poses a problem in the context of virtual client emulation, because the use
 of such key material cannot easily be coordinated between emulating clients.
-However, reusing a key/nonce pair for different application messages leaks 
-information about the plaintexts. Moreover, any client receving the two would 
+However, reusing a key/nonce pair for different application messages leaks
+information about the plaintexts. Moreover, any client receving the two would
 not be able to decrypt the second message as the requisit key would already
 be deleted.
 
@@ -296,10 +294,10 @@ where the encryption keys are derived using a challenge-based approach.
 
 Using a forward-secret exporter secret (provided by the safe extension API),
 each member creates a new secret tree. Whenever a group member wants to send a
-message, it creates a fresh random challenge (see {{challenge generation}}) for 
+message, it creates a fresh random challenge (see {{challenge-generation}}) for
 that message. Each challenge is mapped to its own secret using a forward-secure
 KDF implimented using a new secret tree (see {{forward-secure-kdf}}). The secret
-is used to derive the key/nonce used to encrypt a message. The sender includes 
+is used to derive the key/nonce used to encrypt a message. The sender includes
 the challenge in the AAD of the application message so that receivers can also
 derive the decryption key. Finally, to ensure forward secrecy of the
 challenge-based application message both sender and recipients apply the same
@@ -348,7 +346,7 @@ struct {
 struct {
   GroupChallengeContext group_challenge_context;
   uint32 generation;
-	opaque application_context<V>;
+  opaque application_context<V>;
 } ChallengeContext
 
 challenge = FS-KDF.Expand(challenge-seed, ChallengeContext, KDF.Nh)
@@ -361,7 +359,7 @@ application messages.
 
 ~~~~
 struct {
-	opaque challenge<V>;
+  opaque challenge<V>;
   uint32 sender_index;
 } CBAMSender;
 
@@ -375,10 +373,7 @@ struct {
 ### Message Authentication
 
 The following structs are used to authenticate data in a challenge-based
-application message. When using random-access mode, this is done almost
-identically to standard application messages. In public-anonymous mode the
-signature is producing using the groups signature keys described in
-{{group-signature-keys}}. The private-anonymous mode omits signatures entirely.
+application message.
 
 ~~~~
 
@@ -390,25 +385,25 @@ struct {
   uint64 epoch;
   CBAMSender sender;
   opaque authenticated_data<V>;
-	opaque application_data<V>;
+  opaque application_data<V>;
 } CBAMFramedContent
 
 struct {
   ProtocolVersion version = mls10;
   WireFormat wire_format;
   CBAMFramedContent content;
-	GroupContext context;
+  GroupContext context;
 } CBAMFramedContentTBS;
 
 struct {
-	/* SignWithLabel(., "CBAMFramedContentTBS", CBAMFramedContentTBS) */
-	opaque signature<V>;
+  /* SignWithLabel(., "CBAMFramedContentTBS", CBAMFramedContentTBS) */
+  opaque signature<V>;
 } CBAMFramedContentAuthData;
 
 struct {
   WireFormat wire_format;
   CBAMFramedContent content;
-	CBAMFramedContentAuthData auth_data;
+  CBAMFramedContentAuthData auth_data;
 } CBAMAuthenticatedContent;
 
 ~~~~
@@ -436,8 +431,8 @@ challenge C using the challenge-based secret tree as described in
 
 ~~~~
 struct {
-	opaque application_data<V>;
-	CBAMFramedContentAuthData auth_data;
+  opaque application_data<V>;
+  CBAMFramedContentAuthData auth_data;
   opaque padding[length_of_padding];
 } CBAMPrivateMessageContent;
 
