@@ -12,7 +12,11 @@ stand_alone: yes
 pi: [toc, sortrefs, symrefs]
 
 author:
- -  ins: K. Kohbrok
+ -  ins: J. Alwen
+    name: Joel Alwen
+	organization: AWS Wickr
+	email: alwenjo@amazon.com
+-  ins: K. Kohbrok
     name: Konrad Kohbrok
     organization: Phoenix R&D
     email: konrad.kohbrok@datashrine.de
@@ -198,15 +202,15 @@ higher-level groups.
 
 # Client emulation
 
-A set S of emulator clients that want to emulate one or more virtual clients
-must first form an MLS heirarchical group G with membership S. Emulator clients
-in S use G to coordinate their emulation of G's virtual clients. Just like real
+A set C of emulator clients that want to emulate one or more virtual clients
+must first form an MLS heirarchical group G with membership C. The emulator 
+clients use G to coordinate their shared virtual clients. Just like real
 clients, a virtual client V can create, join or participate in any group S, even
 acting as an emulator client itself for some other virtual client. If V joins a
-group S then this makes G a subgroup of supergroup S and with V being G's
+group S then this makes G a subgroup of supergroup G where V is called G's
 representative in V. G may have 0 or more representatives which can each be a
 member of 0 or more supergroups. But G can have at most 1 representative in a
-given subgroup S. Emulating clients in G MUST ensure that G and all of its
+given supergroup. Emulating clients in G MUST ensure that G and all of its
 supergroups have distinct group IDs.
 
 An emulator client E in G creates a new virtual client V of G by assigning the V
